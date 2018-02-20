@@ -10,7 +10,6 @@ notebook
 ipywidgets
 numpy>=1.9
 scipy
-pyfits>=3.3
 matplotlib
 Sphinx
 wcsaxes
