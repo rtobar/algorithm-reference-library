@@ -3,8 +3,8 @@
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from dask import delayed
 
+from arl import delayed
 from arl.calibration.operations import apply_gaintable, create_gaintable_from_blockvisibility
 from arl.data.persist import arl_dump, arl_load
 from arl.data.polarisation import PolarisationFrame

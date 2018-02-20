@@ -1,8 +1,7 @@
 """ Pipelines expressed as dask graphs
 """
 
-from dask import delayed
-
+from arl import delayed
 from arl.data.parameters import get_parameter
 from arl.image.deconvolution import restore_cube
 from arl.graphs.graphs import create_deconvolve_graph, create_invert_graph, create_residual_graph, \

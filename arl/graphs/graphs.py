@@ -36,9 +36,9 @@ workaround only.
 """
 
 import numpy
-from dask import delayed
 from dask.distributed import wait
 
+from arl import delayed
 from arl.calibration.operations import apply_gaintable
 from arl.calibration.solvers import solve_gaintable
 from arl.data.data_models import Image

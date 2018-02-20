@@ -10,8 +10,8 @@ import numpy
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.wcs.utils import pixel_to_skycoord
-from dask import delayed
 
+from arl import delayed
 from arl.calibration.operations import apply_gaintable, create_gaintable_from_blockvisibility
 from arl.data.polarisation import PolarisationFrame
 from arl.graphs.graphs import create_invert_facet_graph, create_predict_facet_graph, \

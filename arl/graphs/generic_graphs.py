@@ -16,8 +16,7 @@ subimages and passed to processing by imagerooter, and then the answers are reas
 We  could keep the graph and use it in other graphs. See the imaging-dask note book for more detail.
 """
 
-from dask import delayed
-
+from arl import delayed
 from arl.data.data_models import Image
 from arl.image.operations import copy_image, create_empty_image_like
 from arl.image.gather_scatter import image_gather_facets, image_scatter_facets
