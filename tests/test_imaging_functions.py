@@ -14,7 +14,7 @@ from arl.data.parameters import set_parameters
 from arl.data.polarisation import PolarisationFrame
 from arl.image.operations import export_image_to_fits, create_empty_image_like, smooth_image, qa_image
 from arl.imaging import predict_2d, invert_2d, create_image_from_visibility, predict_skycomponent_visibility
-from arl.imaging.imaging_context import predict_function, invert_function
+from arl.imaging.imaging_context import predict_function, invert_function, make_vis_iter, imaging_contexts
 from arl.imaging.weighting import weight_visibility
 from arl.skycomponent.operations import find_skycomponents, find_nearest_component, insert_skycomponent
 from arl.util.testing_support import create_named_configuration, ingest_unittest_visibility, create_unittest_model, \
@@ -38,7 +38,9 @@ class TestImagingFunctions(unittest.TestCase):
                        'oversampling': 2,
                        'kernel': '2d',
                        'wstep': 4.0,
-                       'wstack': 4.0}
+                       'wstack': 4.0,
+                       'vis_slices': 10,
+                       'timeslice':'auto'}
         self.ini = '%s/test_imaging_config.ini' % self.dir
         set_parameters(self.ini, self.params, 'imaging')
         
@@ -384,6 +386,17 @@ class TestImagingFunctions(unittest.TestCase):
         im = create_image_from_visibility(self.componentvis, npixel=128, frequency=self.frequency, nchan=1)
         assert im.data.shape == (1, 1, 128, 128)
 
+    def test_make_vis_iter(self):
+        set_parameters(self.ini, self.params, 'imaging')
+        self.actualSetUp()
+        contexts = imaging_contexts()
+        for context in contexts:
+            vis_iter = make_vis_iter(self.componentvis, context, self.ini)
+            total_nvis = 0
+            for rows in vis_iter:
+                nvis = numpy.sum(rows)
+                total_nvis += nvis
+            assert total_nvis == self.componentvis.nvis, context
 
 if __name__ == '__main__':
     unittest.main()

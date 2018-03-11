@@ -78,7 +78,7 @@ def vis_wstack_iter(vis: Visibility, wstack=None, vis_slices=None) -> numpy.ndar
         else:
             wstack = 2 * wmaxabs
     else:
-        vis_slices = 1 + 2 * numpy.round(wmaxabs / wstack).astype('int')
+        vis_slices = 1 + 2 * numpy.round(wmaxabs / float(wstack)).astype('int')
         boxes = numpy.linspace(- wmaxabs, +wmaxabs, vis_slices)
         if vis_slices > 1:
             wstack = boxes[1] - boxes[0]
@@ -99,6 +99,8 @@ def vis_slice_iter(vis: Union[Visibility, BlockVisibility], step=None, vis_slice
 
     """
     assert isinstance(vis, Visibility) or isinstance(vis, BlockVisibility), vis
+    
+    vis_slices=int(vis_slices)
     
     if step is None:
         assert vis_slices is not None, "vis slicing not specified: set either step or vis_slices"

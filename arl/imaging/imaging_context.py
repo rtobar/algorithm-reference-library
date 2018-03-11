@@ -21,6 +21,7 @@ from arl.visibility.base import copy_visibility, create_visibility_from_rows
 from arl.visibility.coalesce import coalesce_visibility
 from arl.visibility.iterators import vis_slice_iter, vis_timeslice_iter, vis_null_iter, \
     vis_wstack_iter
+from arl.data.parameters import get_parameter
 
 log = logging.getLogger(__name__)
 
@@ -41,41 +42,49 @@ def imaging_contexts():
                        'invert': invert_2d_base,
                        'image_iterator': image_null_iter,
                        'vis_iterator': vis_null_iter,
+                       'vis_iterator_args': None,
                        'inner': 'image'},
                 'facets': {'predict': predict_2d_base,
                            'invert': invert_2d_base,
                            'image_iterator': image_raster_iter,
                            'vis_iterator': vis_null_iter,
+                           'vis_iterator_args': None,
                            'inner': 'image'},
                 'facets_slice': {'predict': predict_2d_base,
                                  'invert': invert_2d_base,
                                  'image_iterator': image_raster_iter,
                                  'vis_iterator': vis_slice_iter,
+                                 'vis_iterator_args': ['vis_slices'],
                                  'inner': 'vis'},
                 'facets_timeslice': {'predict': predict_timeslice_single,
                                      'invert': invert_timeslice_single,
                                      'image_iterator': image_raster_iter,
                                      'vis_iterator': vis_timeslice_iter,
+                                     'vis_iterator_args': ['timeslice'],
                                      'inner': 'image'},
                 'facets_wstack': {'predict': predict_wstack_single,
                                   'invert': invert_wstack_single,
                                   'image_iterator': image_raster_iter,
                                   'vis_iterator': vis_wstack_iter,
+                                  'vis_iterator_args': ['wstack'],
                                   'inner': 'vis'},
                 'slice': {'predict': predict_2d_base,
                           'invert': invert_2d_base,
                           'image_iterator': image_null_iter,
                           'vis_iterator': vis_slice_iter,
+                          'vis_iterator_args': ['vis_slices'],
                           'inner': 'image'},
                 'timeslice': {'predict': predict_timeslice_single,
                               'invert': invert_timeslice_single,
                               'image_iterator': image_null_iter,
                               'vis_iterator': vis_timeslice_iter,
+                              'vis_iterator_args': ['timeslice'],
                               'inner': 'image'},
                 'wstack': {'predict': predict_wstack_single,
                            'invert': invert_wstack_single,
                            'image_iterator': image_null_iter,
                            'vis_iterator': vis_wstack_iter,
+                           'vis_iterator_args': ['wstack'],
                            'inner': 'image'}}
     
     return contexts
@@ -85,6 +94,27 @@ def imaging_context(context='2d'):
     contexts = imaging_contexts()
     assert context in contexts.keys(), context
     return contexts[context]
+
+
+def make_vis_iter(vis, context, arl_config='arl_config.ini'):
+    """Make the visibility iterator for this context
+    
+    :param context:
+    :param arl_config:
+    :return:
+    """
+    c = imaging_context(context)
+    vis_iter = c['vis_iterator']
+    keys = c['vis_iterator_args']
+    params = {}
+    if keys is not None:
+        for key in keys:
+            value=get_parameter(arl_config=arl_config, key=key, section='imaging')
+            params[key] = value
+        
+        return vis_iter(vis, **params)
+    else:
+        return vis_iter(vis)
 
 
 def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', inner=None,
