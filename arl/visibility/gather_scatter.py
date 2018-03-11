@@ -23,7 +23,7 @@ from arl.visibility.base import create_visibility_from_rows
 log = logging.getLogger(__name__)
 
 
-def visibility_scatter(vis: Visibility, vis_iter, vis_slices=1, **kwargs) -> List[Visibility]:
+def visibility_scatter(vis: Visibility, vis_iter) -> List[Visibility]:
     """Scatter a visibility into a list of subvisibilities
 
     :param vis: Visibility
@@ -32,15 +32,14 @@ def visibility_scatter(vis: Visibility, vis_iter, vis_slices=1, **kwargs) -> Lis
     """
     
     visibility_list = list()
-    for i, rows in enumerate(vis_iter(vis, vis_slices=vis_slices, **kwargs)):
+    for i, rows in enumerate(vis_iter):
         subvis = create_visibility_from_rows(vis, rows)
         visibility_list.append(subvis)
         
     return visibility_list
 
 
-def visibility_gather(visibility_list: List[Visibility], vis: Visibility, vis_iter, vis_slices=1,
-                      **kwargs) -> Visibility:
+def visibility_gather(visibility_list: List[Visibility], vis: Visibility, vis_iter) -> Visibility:
     """Gather a list of subvisibilities back into a visibility
     
     The iterator setup must be the same as used in the scatter.
@@ -51,7 +50,7 @@ def visibility_gather(visibility_list: List[Visibility], vis: Visibility, vis_it
     :return: vis
     """
     
-    for i, rows in enumerate(vis_iter(vis, vis_slices=vis_slices, **kwargs)):
+    for i, rows in enumerate(vis_iter):
         assert i < len(visibility_list), "Gather not consistent with scatter"
         if numpy.sum(rows) and visibility_list[i] is not None:
             vis.data[rows] = visibility_list[i].data[...]
@@ -59,45 +58,46 @@ def visibility_gather(visibility_list: List[Visibility], vis: Visibility, vis_it
     return vis
 
 
-def visibility_scatter_index(vis: Visibility, **kwargs) -> List[Visibility]:
-    return visibility_scatter(vis, vis_iter=vis_slice_iter, **kwargs)
+def visibility_scatter_index(vis: Visibility, vis_slices) -> List[Visibility]:
+    return visibility_scatter(vis, vis_iter=vis_slice_iter(vis, vis_slices))
 
 
-def visibility_scatter_w(vis: Visibility, **kwargs) -> List[Visibility]:
+def visibility_scatter_w(vis: Visibility, wstack=100.0) -> List[Visibility]:
     if isinstance(vis, BlockVisibility):
-        avis = coalesce_visibility(vis, **(kwargs))
-        visibility_list = visibility_scatter(avis, vis_iter=vis_wstack_iter, **kwargs)
+        avis = coalesce_visibility(vis)
+        visibility_list = visibility_scatter(avis, vis_iter=vis_wstack_iter(avis, wstack=wstack))
     else:
-        visibility_list = visibility_scatter(vis, vis_iter=vis_wstack_iter, **kwargs)
+        visibility_list = visibility_scatter(vis, vis_iter=vis_wstack_iter(vis, wstack=wstack))
         
     return visibility_list
 
 
-def visibility_scatter_time(vis: Visibility, **kwargs) -> List[Visibility]:
-    return visibility_scatter(vis, vis_iter=vis_timeslice_iter, **kwargs)
+def visibility_scatter_time(vis: Visibility, timeslice='auto') -> List[Visibility]:
+    return visibility_scatter(vis, vis_iter=vis_timeslice_iter(vis, timeslice=timeslice))
 
 
-def visibility_gather_index(visibility_list: List[Visibility], vis: Visibility, **kwargs) -> Visibility:
-    return visibility_gather(visibility_list, vis, vis_iter=vis_slice_iter, **kwargs)
+def visibility_gather_index(visibility_list: List[Visibility], vis: Visibility, vis_slices=10000) -> Visibility:
+    return visibility_gather(visibility_list, vis, vis_iter=vis_slice_iter(vis, vis_slices=vis_slices))
 
 
-def visibility_gather_w(visibility_list: List[Visibility], vis: Visibility, **kwargs) -> Visibility:
+def visibility_gather_w(visibility_list: List[Visibility], vis: Visibility, wstack=100.0) -> Visibility:
     if isinstance(vis, BlockVisibility):
-        cvis = coalesce_visibility(vis, **kwargs)
-        return decoalesce_visibility(visibility_gather(visibility_list, cvis, vis_iter=vis_wstack_iter, **kwargs))
+        cvis = coalesce_visibility(vis)
+        gcvis = visibility_gather(visibility_list, cvis, vis_iter=vis_wstack_iter(cvis, wstack=wstack))
+        return decoalesce_visibility(gcvis)
     else:
-        return visibility_gather(visibility_list, vis, vis_iter=vis_wstack_iter, **kwargs)
+        return visibility_gather(visibility_list, vis, vis_iter=vis_wstack_iter(vis, wstack=wstack))
 
 
-def visibility_gather_time(visibility_list: List[Visibility], vis: Visibility, **kwargs) -> Visibility:
-    return visibility_gather(visibility_list, vis, vis_iter=vis_timeslice_iter, **kwargs)
+def visibility_gather_time(visibility_list: List[Visibility], vis: Visibility, timeslice='auto') -> Visibility:
+    return visibility_gather(visibility_list, vis, vis_iter=vis_timeslice_iter(vis, timeslice=timeslice))
 
 
-def visibility_scatter_channel(vis: BlockVisibility, **kwargs) -> List[Visibility]:
+def visibility_scatter_channel(vis: BlockVisibility) -> List[Visibility]:
     """ Scatter in frequency
     
     :param vis:
-    :param kwargs:
+    :param arl_config:
     :return:
     """
     def extract_channel(v, chan):
@@ -120,12 +120,12 @@ def visibility_scatter_channel(vis: BlockVisibility, **kwargs) -> List[Visibilit
     return [extract_channel(vis, channel) for channel, _ in enumerate(vis.frequency)]
 
 
-def visibility_gather_channel(vis_list: List[Visibility], vis: Visibility = None, **kwargs):
+def visibility_gather_channel(vis_list: List[Visibility], vis: Visibility = None):
     """ Gather a visibility by channel
     
     :param vis_list:
     :param vis:
-    :param kwargs:
+    :param arl_config:
     :return:
     """
     

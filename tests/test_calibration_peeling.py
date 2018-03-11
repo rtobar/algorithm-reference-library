@@ -59,8 +59,7 @@ class TestCalibrationPeeling(unittest.TestCase):
         vis = apply_gaintable(vis, gt, timeslice='auto')
         
         # Now create a plausible field using the GLEAM sources
-        model = create_image_from_visibility(vis, cellsize=0.001, frequency=frequency,
-                                             polarisation_frame=PolarisationFrame('stokesIQUV'))
+        model = create_image_from_visibility(vis, cellsize=0.001, frequency=frequency)
 
         bm = create_low_test_beam(model=model)
         sc = create_low_test_skycomponents_from_gleam(flux_limit=1.0,

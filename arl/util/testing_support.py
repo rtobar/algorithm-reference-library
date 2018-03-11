@@ -44,7 +44,6 @@ from arl.calibration.calibration_control import create_calibration_controls
 from arl.calibration.operations import create_gaintable_from_blockvisibility, apply_gaintable
 from arl.data.data_models import Configuration, Image, GainTable, Skycomponent
 from arl.data.parameters import arl_path
-from arl.data.parameters import get_parameter
 from arl.data.polarisation import PolarisationFrame
 from arl.image.operations import import_image_from_fits, create_image_from_array, \
     reproject_image, create_empty_image_like, qa_image
@@ -62,7 +61,8 @@ def create_configuration_from_file(antfile: str, location: EarthLocation = None,
                                    mount: str = 'altaz',
                                    names: str = "%d", frame: str = 'local',
                                    diameter=35.0,
-                                   rmax=None) -> Configuration:
+                                   rmax=None,
+                                   arl_config='arl_config.ini') -> Configuration:
     """ Define from a file
 
     :param names:
@@ -113,7 +113,7 @@ def create_LOFAR_configuration(antfile: str, meta: dict = None) -> Configuration
     return fc
 
 
-def create_named_configuration(name: str = 'LOWBD2', **kwargs) -> Configuration:
+def create_named_configuration(name: str = 'LOWBD2', rmax=numpy.infty) -> Configuration:
     """ Standard configurations e.g. LOWBD2, MIDBD2
 
     :param name: name of Configuration LOWBD2, LOWBD1, LOFAR, VLAA
@@ -134,19 +134,18 @@ def create_named_configuration(name: str = 'LOWBD2', **kwargs) -> Configuration:
         location = EarthLocation(lon="116.4999", lat="-26.7000", height=300.0)
         fc = create_configuration_from_file(antfile=arl_path("data/configurations/LOWBD2.csv"),
                                             location=location, mount='xy', names='LOWBD2_%d',
-                                            diameter=35.0, **kwargs)
+                                            diameter=35.0, rmax=rmax)
     elif name == 'LOWBD1':
         location = EarthLocation(lon="116.4999", lat="-26.7000", height=300.0)
         fc = create_configuration_from_file(antfile=arl_path("data/configurations/LOWBD1.csv"),
                                             location=location, mount='xy', names='LOWBD1_%d',
-                                            diameter=35.0, **kwargs)
+                                            diameter=35.0, rmax=rmax)
     elif name == 'LOWBD2-CORE':
         location = EarthLocation(lon="116.4999", lat="-26.7000", height=300.0)
         fc = create_configuration_from_file(antfile=arl_path("data/configurations/LOWBD2-CORE.csv"),
                                             location=location, mount='xy', names='LOWBD2_%d',
-                                            diameter=35.0, **kwargs)
+                                            diameter=35.0, rmax=rmax)
     elif name == 'LOFAR':
-        assert get_parameter(kwargs, "meta", False) is False
         fc = create_LOFAR_configuration(antfile=arl_path("data/configurations/LOFAR.csv"))
     elif name == 'VLAA':
         location = EarthLocation(lon="-107.6184", lat="34.0784", height=2124.0)
@@ -154,14 +153,14 @@ def create_named_configuration(name: str = 'LOWBD2', **kwargs) -> Configuration:
                                             location=location,
                                             mount='altaz',
                                             names='VLA_%d',
-                                            diameter=25.0, **kwargs)
+                                            diameter=25.0, rmax=rmax)
     elif name == 'VLAA_north':
         location = EarthLocation(lon="-107.6184", lat="90.000", height=2124.0)
         fc = create_configuration_from_file(antfile=arl_path("data/configurations/VLA_A_hor_xyz.csv"),
                                             location=location,
                                             mount='altaz',
                                             names='VLA_%d',
-                                            diameter=25.0, **kwargs)
+                                            diameter=25.0, rmax=rmax)
     else:
         raise ValueError("No such Configuration %s" % name)
     return fc
@@ -593,7 +592,7 @@ def create_blockvisibility_iterator(config: Configuration, times: numpy.array, f
                                     channel_bandwidth, phasecentre: SkyCoord, weight: float = 1,
                                     polarisation_frame=PolarisationFrame('stokesI'), integration_time=1.0,
                                     number_integrations=1, predict=predict_timeslice, model=None, components=None,
-                                    phase_error=0.0, amplitude_error=0.0, sleep=0.0, **kwargs):
+                                    phase_error=0.0, amplitude_error=0.0, sleep=0.0):
     """ Create a sequence of Visibilities and optionally predicting and coalescing
 
     This is useful mainly for performing large simulations. Do something like::
@@ -629,7 +628,7 @@ def create_blockvisibility_iterator(config: Configuration, times: numpy.array, f
                                       channel_bandwidth=channel_bandwidth)
         
         if model is not None:
-            vis = predict(bvis, model, **kwargs)
+            vis = predict(bvis, model, arl_config='arl_config.ini')
             bvis = convert_visibility_to_blockvisibility(vis)
         
         if components is not None:
@@ -648,7 +647,7 @@ def create_blockvisibility_iterator(config: Configuration, times: numpy.array, f
 
 
 def simulate_gaintable(gt: GainTable, phase_error=0.1, amplitude_error=0.0, smooth_channels=1,
-                       leakage=0.0, seed=180555, **kwargs) -> GainTable:
+                       leakage=0.0, seed=180555, timeslice='auto') -> GainTable:
     """ Simulate a gain table
     
     :type gt: GainTable
@@ -657,7 +656,7 @@ def simulate_gaintable(gt: GainTable, phase_error=0.1, amplitude_error=0.0, smoo
     :param leakage: std of cross hand leakage
     :param seed: Seed for random numbers def: 180555
     :param smooth_channels: Use bspline over smooth_channels
-    :param kwargs:
+    :param arl_config:
     :return: Gaintable
     
     """
@@ -764,8 +763,7 @@ def create_unittest_model(vis, model_pol, npixel=None, cellsize=None, nchan=1):
         cellsize = advice['cellsize']
     if npixel is None:
         npixel = advice['npixels2']
-    model = create_image_from_visibility(vis, npixel=npixel, cellsize=cellsize, nchan=nchan,
-                                         polarisation_frame=model_pol)
+    model = create_image_from_visibility(vis, npixel=npixel, cellsize=cellsize, nchan=nchan)
     return model
 
 
@@ -785,10 +783,7 @@ def insert_unittest_errors(vt, seed=180555):
         gaintable = \
             create_gaintable_from_blockvisibility(vt, timeslice=controls[c]['timeslice'])
         gaintable = simulate_gaintable(gaintable,
-                                       timeslice=controls[c]['timeslice'],
-                                       phase_only=controls[c]['phase_only'],
-                                       crosspol=controls[c]['shape'] == 'matrix',
                                        phase_error=phase_errors[c], amplitude_error=amp_errors[c])
-        vt = apply_gaintable(vt, gaintable, inverse=True, timeslice=controls[c]['timeslice'])
+        vt = apply_gaintable(vt, gaintable, inverse=True)
     
     return vt

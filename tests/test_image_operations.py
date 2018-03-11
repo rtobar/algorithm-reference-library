@@ -11,7 +11,7 @@ import numpy
 from arl.data.polarisation import PolarisationFrame
 from arl.image.operations import copy_image, create_empty_image_like, create_image_from_array, add_image, \
     export_image_to_fits, qa_image, reproject_image, smooth_image, checkwcs, convert_polimage_to_stokes, \
-    convert_stokes_to_polimage, polarisation_frame_from_wcs, fft_image, show_image, \
+    convert_stokes_to_polimage, polarisation_frame_from_wcs, fft_image, \
     calculate_image_frequency_moments, calculate_image_from_frequency_moments, pad_image, convert_image_to_kernel, \
     create_w_term_like
 from arl.util.testing_support import create_test_image, create_low_test_image_from_gleam

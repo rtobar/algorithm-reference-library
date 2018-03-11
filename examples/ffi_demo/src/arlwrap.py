@@ -1299,7 +1299,7 @@ def arl_create_image_from_visibility_ffi(vis_in, img_in):
     tvis.phasecentre = load_phasecentre(vis_in.phasecentre)
 
     # Default args for now
-    image = create_image_from_visibility(tvis, cellsize=0.001, npixel=256)
+    image = create_image_from_visibility(tvis, npixel=256, cellsize=0.001)
 
     #numpy.copyto(c_img.data, image.data)
 
@@ -1337,8 +1337,9 @@ def arl_create_image_from_blockvisibility_ffi(lowconfig, blockvis_in, cellsize, 
     py_outimg = cImage(img_out, new=True);
 
 # Construct a model from py_blockvisin
-    res = create_image_from_visibility(py_blockvisin, npixel=npixel, frequency=[numpy.average(frequency)], nchan=1,
-        channel_bandwidth=[numpy.sum(channel_bandwidth)], cellsize=cellsize, phasecentre=phasecentre1)
+    res = create_image_from_visibility(py_blockvisin, npixel=npixel, cellsize=cellsize, phasecentre=phasecentre1,
+                                       frequency=[numpy.average(frequency)],
+                                       channel_bandwidth=[numpy.sum(channel_bandwidth)], nchan=1)
 
     #numpy.copyto(c_img.data, image.data)
 

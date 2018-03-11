@@ -117,8 +117,8 @@ class TestCalibrationOperations(unittest.TestCase):
             log.info("Created gain table: %s" % (gaintable_summary(gt)))
             gt = simulate_gaintable(gt, phase_error=0.1, amplitude_error=0.1, timeslice='auto')
             original = copy_visibility(self.vis)
-            vis = apply_gaintable(self.vis, gt, timeslice='auto')
-            vis = apply_gaintable(self.vis, gt, inverse=True, timeslice='auto')
+            vis = apply_gaintable(self.vis, gt)
+            vis = apply_gaintable(self.vis, gt, inverse=True)
             error = numpy.max(numpy.abs(vis.vis - original.vis))
             assert error < 1e-12, "Error = %s" % (error)
 
@@ -128,7 +128,7 @@ class TestCalibrationOperations(unittest.TestCase):
             gt = create_gaintable_from_blockvisibility(self.vis, timeslice='auto')
             gt.data['gain']*=0.0
             original = copy_visibility(self.vis)
-            vis = apply_gaintable(self.vis, gt, inverse=True, timeslice='auto')
+            vis = apply_gaintable(self.vis, gt, inverse=True)
             error = numpy.max(numpy.abs(vis.vis[:,0,1,...] - original.vis[:,0,1,...]))
             assert error < 1e-12, "Error = %s" % (error)
 
@@ -139,8 +139,6 @@ class TestCalibrationOperations(unittest.TestCase):
         for makecopy in [True, False]:
             selected_gt = create_gaintable_from_rows(gt, rows, makecopy=makecopy)
             assert selected_gt.ntimes == numpy.sum(numpy.array(rows))
-
-
 
 if __name__ == '__main__':
     unittest.main()

@@ -11,13 +11,13 @@ import logging
 from arl.calibration.operations import create_gaintable_from_blockvisibility, apply_gaintable, qa_gaintable
 from arl.calibration.solvers import solve_gaintable
 from arl.data.data_models import Visibility
-from arl.data.parameters import get_parameter
+from arl.data.parameters import set_parameters, get_parameter
 from arl.visibility.coalesce import convert_visibility_to_blockvisibility, convert_blockvisibility_to_visibility
 
 log = logging.getLogger(__name__)
 
 
-def create_calibration_controls(**kwargs):
+def create_calibration_controls(arl_config='arl_config.ini'):
     """Contains all the control information for calibration
 
     The fields are:
@@ -31,7 +31,7 @@ def create_calibration_controls(**kwargs):
     
     The calibrate function takes a context string e.g. TGB. It then calibrates each of these Jones matrices in turn.
 
-    :param kwargs:
+    :param arl_config:
     :return:
     """
 
@@ -40,11 +40,12 @@ def create_calibration_controls(**kwargs):
                 'P': {'shape': 'matrix', 'timeslice': 1e4, 'phase_only': False, 'first_selfcal': 0},
                 'B': {'shape': 'vector', 'timeslice': 1e5, 'phase_only': False, 'first_selfcal': 0},
                 'I': {'shape': 'vector', 'timeslice': 1.0, 'phase_only': True, 'first_selfcal': 0}}
+    set_parameters(arl_config, controls, 'calibration')
 
     return controls
 
 
-def calibrate_function(vis, model_vis, context='T', controls=None, iteration=0, **kwargs):
+def calibrate_function(vis, model_vis, context='T', controls=None, iteration=0, arl_config='arl_config.ini'):
     """ Calibrate using algorithm specified by context
     
     The context string can denote a sequence of calibrations e.g. TGB with different timescales.
@@ -54,13 +55,13 @@ def calibrate_function(vis, model_vis, context='T', controls=None, iteration=0, 
     :param context: calibration contexts in order of correction e.g. 'TGB'
     :param control: controls dictionary, modified as necessary
     :param iteration: Iteration number to be compared to the 'first_selfcal' field.
-    :param kwargs:
+    :param arl_config:
     :return: Calibrated data, dict(gaintables)
     """
     gaintables = {}
     
     if controls is None:
-        controls = create_calibration_controls(**kwargs)
+        controls = create_calibration_controls(arl_config)
     
     isVis = isinstance(vis, Visibility)
     if isVis:

@@ -16,21 +16,19 @@ from typing import Union
 import numpy
 
 from arl.data.data_models import Visibility, BlockVisibility
-from arl.data.parameters import get_parameter
 
 log = logging.getLogger(__name__)
 
-def vis_null_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
+def vis_null_iter(vis: Visibility) -> numpy.ndarray:
     """One time iterator returning true for all rows
     
     :param vis:
-    :param kwargs:
     :return:
     """
     yield numpy.ones_like(vis.time, dtype=bool)
 
 
-def vis_timeslice_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
+def vis_timeslice_iter(vis: Visibility, timeslice='auto', vis_slices=None) -> numpy.ndarray:
     """ W slice iterator
 
     :param wstack: wstack (wavelengths)
@@ -41,7 +39,6 @@ def vis_timeslice_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
     timemin = numpy.min(vis.time)
     timemax = numpy.max(vis.time)
     
-    timeslice = get_parameter(kwargs, "timeslice", 'auto')
     if timeslice == 'auto':
         boxes = numpy.unique(vis.time)
         timeslice = 0.1
@@ -51,7 +48,6 @@ def vis_timeslice_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
     elif isinstance(timeslice, float) or isinstance(timeslice, int):
         boxes = numpy.arange(timemin, timemax, timeslice)
     else:
-        vis_slices = get_parameter(kwargs, "vis_slices", None)
         assert vis_slices is not None, "Time slicing not specified: set either timeslice or vis_slices"
         boxes = numpy.linspace(timemin, timemax, vis_slices)
         if vis_slices > 1:
@@ -64,7 +60,7 @@ def vis_timeslice_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
         yield rows
 
 
-def vis_wstack_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
+def vis_wstack_iter(vis: Visibility, wstack=None, vis_slices=None) -> numpy.ndarray:
     """ W slice iterator
 
     :param wstack: wstack (wavelengths)
@@ -74,9 +70,7 @@ def vis_wstack_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
     assert isinstance(vis, Visibility), vis
     wmaxabs = numpy.max(numpy.abs(vis.w))
     
-    wstack = get_parameter(kwargs, 'wstack', None)
     if wstack is None:
-        vis_slices = get_parameter(kwargs, "vis_slices", None)
         assert vis_slices is not None, "w slicing not specified: set either wstack or vis_slices"
         boxes = numpy.linspace(-wmaxabs, wmaxabs, vis_slices)
         if vis_slices > 1:
@@ -96,7 +90,7 @@ def vis_wstack_iter(vis: Visibility, **kwargs) -> numpy.ndarray:
         yield rows
 
 
-def vis_slice_iter(vis: Union[Visibility, BlockVisibility], **kwargs) -> numpy.ndarray:
+def vis_slice_iter(vis: Union[Visibility, BlockVisibility], step=None, vis_slices=None) -> numpy.ndarray:
     """ Iterates in slices
 
     :param step: Size of step to be iterated over (in rows)
@@ -106,9 +100,7 @@ def vis_slice_iter(vis: Union[Visibility, BlockVisibility], **kwargs) -> numpy.n
     """
     assert isinstance(vis, Visibility) or isinstance(vis, BlockVisibility), vis
     
-    step = get_parameter(kwargs, "step", None)
     if step is None:
-        vis_slices = get_parameter(kwargs, "vis_slices", None)
         assert vis_slices is not None, "vis slicing not specified: set either step or vis_slices"
         step = vis.nvis // vis_slices
         

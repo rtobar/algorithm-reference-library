@@ -44,7 +44,8 @@ from arl.visibility.coalesce import coalesce_visibility, decoalesce_visibility
 log = logging.getLogger(__name__)
 
 
-def shift_vis_to_image(vis: Visibility, im: Image, tangent: bool = True, inverse: bool = False) -> Visibility:
+def shift_vis_to_image(vis: Visibility, im: Image, tangent: bool = True,
+                       inverse: bool = False) -> Visibility:
     """Shift visibility to the FFT phase centre of the image in place
 
     :param vis: Visibility data
@@ -98,8 +99,8 @@ def normalize_sumwt(im: Image, sumwt) -> Image:
     return im
 
 
-def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image,
-                    **kwargs) -> Union[BlockVisibility, Visibility]:
+def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image, padding=2,
+                    arl_config='arl_config.ini') -> Union[BlockVisibility, Visibility]:
     """ Predict using convolutional degridding.
 
     This is at the bottom of the layering i.e. all transforms are eventually expressed in terms of
@@ -111,7 +112,7 @@ def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image,
     """
     if isinstance(vis, BlockVisibility):
         log.debug("imaging.predict: coalescing prior to prediction")
-        avis = coalesce_visibility(vis, **kwargs)
+        avis = coalesce_visibility(vis)
     else:
         avis = vis
     
@@ -119,13 +120,10 @@ def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image,
     
     _, _, ny, nx = model.data.shape
     
-    padding = {}
-    if get_parameter(kwargs, "padding", False):
-        padding = {'padding': get_parameter(kwargs, "padding", False)}
     spectral_mode, vfrequencymap = get_frequency_map(avis, model)
     polarisation_mode, vpolarisationmap = get_polarisation_map(avis, model)
-    uvw_mode, shape, padding, vuvwmap = get_uvw_map(avis, model, **padding)
-    kernel_name, gcf, vkernellist = get_kernel_list(avis, model, **kwargs)
+    uvw_mode, shape, padding, vuvwmap = get_uvw_map(avis, model, padding)
+    kernel_name, gcf, vkernellist = get_kernel_list(avis, model, arl_config='arl_config.ini')
     
     uvgrid = fft((pad_mid(model.data, int(round(padding * nx))) * gcf).astype(dtype=complex))
     
@@ -142,7 +140,7 @@ def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image,
         return svis
 
 
-def predict_2d(vis: Visibility, im: Image, **kwargs) -> Visibility:
+def predict_2d(vis: Visibility, im: Image, arl_config='arl_config.ini') -> Visibility:
     """ Predict using convolutional degridding and w projection
     
     :param vis: Visibility to be predicted
@@ -150,10 +148,11 @@ def predict_2d(vis: Visibility, im: Image, **kwargs) -> Visibility:
     :return: resulting visibility (in place works)
     """
     log.debug("predict_2d: predict using 2d transform")
-    return predict_2d_base(vis, im, **kwargs)
+    return predict_2d_base(vis, im, arl_config=arl_config)
 
 
-def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: bool = True, **kwargs) \
+def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: bool = True,
+                   imaginary=False, padding=False, arl_config='arl_config.ini') \
         -> (Image, numpy.ndarray):
     """ Invert using 2D convolution function, including w projection optionally
 
@@ -170,7 +169,7 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
 
     """
     if not isinstance(vis, Visibility):
-        svis = coalesce_visibility(vis, **kwargs)
+        svis = coalesce_visibility(vis)
     else:
         svis = copy_visibility(vis)
     
@@ -181,19 +180,15 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
     
     nchan, npol, ny, nx = im.data.shape
     
-    padding = {}
-    if get_parameter(kwargs, "padding", False):
-        padding = {'padding': get_parameter(kwargs, "padding", False)}
     spectral_mode, vfrequencymap = get_frequency_map(svis, im)
     polarisation_mode, vpolarisationmap = get_polarisation_map(svis, im)
-    uvw_mode, shape, padding, vuvwmap = get_uvw_map(svis, im, **padding)
-    kernel_name, gcf, vkernellist = get_kernel_list(svis, im, **kwargs)
+    uvw_mode, shape, padding, vuvwmap = get_uvw_map(svis, im, padding)
+    kernel_name, gcf, vkernellist = get_kernel_list(svis, im, arl_config=arl_config)
     
     # Optionally pad to control aliasing
     imgridpad = numpy.zeros([nchan, npol, int(round(padding * ny)), int(round(padding * nx))], dtype='complex')
     imgridpad, sumwt = convolutional_grid(vkernellist, imgridpad, svis.data['vis'],
-                                          svis.data['imaging_weight'],
-                                          vuvwmap,
+                                          svis.data['imaging_weight'], vuvwmap,
                                           vfrequencymap, vpolarisationmap)
     
     # Fourier transform the padded grid to image, multiply by the gridding correction
@@ -202,7 +197,6 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
     # Normalise weights for consistency with transform
     sumwt /= float(padding * int(round(padding * nx)) * ny)
     
-    imaginary = get_parameter(kwargs, "imaginary", False)
     if imaginary:
         log.debug("invert_2d_base: retaining imaginary part of dirty image")
         result = extract_mid(ifft(imgridpad) * gcf, npixel=nx)
@@ -220,7 +214,7 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
         return resultimage, sumwt
 
 
-def invert_2d(vis: Visibility, im: Image, dopsf=False, normalize=True, **kwargs) -> (Image, numpy.ndarray):
+def invert_2d(vis: Visibility, im: Image, dopsf=False, normalize=True, arl_config='arl_config.ini') -> (Image, numpy.ndarray):
     """ Invert using prolate spheroidal gridding function
 
     Use the image im as a template. Do PSF in a separate call.
@@ -235,8 +229,7 @@ def invert_2d(vis: Visibility, im: Image, dopsf=False, normalize=True, **kwargs)
 
     """
     log.debug("invert_2d: inverting using 2d transform")
-    kwargs['kernel'] = get_parameter(kwargs, "kernel", '2d')
-    return invert_2d_base(vis, im, dopsf, normalize=normalize, **kwargs)
+    return invert_2d_base(vis, im, dopsf, normalize=normalize, arl_config=arl_config)
 
 
 def predict_skycomponent_visibility(vis: Union[Visibility, BlockVisibility],
@@ -334,7 +327,9 @@ def predict_skycomponent_visibility_old(vis: Visibility, sc: Union[Skycomponent,
     return vis
 
 
-def create_image_from_visibility(vis, **kwargs) -> Image:
+def create_image_from_visibility(vis, npixel=512, cellsize=0.001, override_cellsize=True,
+                                 polarisation_frame=PolarisationFrame('stokesI'), phasecentre=None, imagecentre=None,
+                                 frequency=None, channel_bandwidth=None, frame='ICRS', equinox=2000.0, nchan=1) -> Image:
     """Make an empty image from params and Visibility
 
     :param vis:
@@ -352,17 +347,21 @@ def create_image_from_visibility(vis, **kwargs) -> Image:
     
     log.info("create_image_from_visibility: Parsing parameters to get definition of WCS")
     
-    imagecentre = get_parameter(kwargs, "imagecentre", vis.phasecentre)
-    phasecentre = get_parameter(kwargs, "phasecentre", vis.phasecentre)
+    if imagecentre is None:
+        imagecentre = vis.phasecentre
+    if phasecentre is None:
+        phasecentre = vis.phasecentre
     
     # Spectral processing options
     ufrequency = numpy.unique(vis.frequency)
     vnchan = len(ufrequency)
     
-    frequency = get_parameter(kwargs, "frequency", vis.frequency)
-    inchan = get_parameter(kwargs, "nchan", vnchan)
+    if frequency is None:
+        frequency = vis.frequency
+    inchan = nchan
     reffrequency = frequency[0] * units.Hz
-    channel_bandwidth = get_parameter(kwargs, "channel_bandwidth", 0.99999999999 * vis.channel_bandwidth[0]) * units.Hz
+    if channel_bandwidth is None:
+        channel_bandwidth = 0.99999999999 * vis.channel_bandwidth[0] * units.Hz
     
     if (inchan == vnchan) and vnchan > 1:
         log.info(
@@ -387,7 +386,6 @@ def create_image_from_visibility(vis, **kwargs) -> Image:
         raise ValueError("create_image_from_visibility: unknown spectral mode ")
     
     # Image sampling options
-    npixel = get_parameter(kwargs, "npixel", 512)
     uvmax = numpy.max((numpy.abs(vis.data['uvw'][:, 0:1])))
     if isinstance(vis, BlockVisibility):
         uvmax *= numpy.max(frequency) / constants.c.to('m/s').value
@@ -395,16 +393,15 @@ def create_image_from_visibility(vis, **kwargs) -> Image:
     criticalcellsize = 1.0 / (uvmax * 2.0)
     log.info("create_image_from_visibility: Critical cellsize = %f radians, %f degrees" % (
         criticalcellsize, criticalcellsize * 180.0 / numpy.pi))
-    cellsize = get_parameter(kwargs, "cellsize", 0.5 * criticalcellsize)
+    if cellsize is None:
+        cellsize = 0.5 * criticalcellsize
     log.info("create_image_from_visibility: Cellsize          = %f radians, %f degrees" % (cellsize,
                                                                                            cellsize * 180.0 / numpy.pi))
-    override_cellsize = get_parameter(kwargs, "override_cellsize", True)
     if override_cellsize and cellsize > criticalcellsize:
         log.info("create_image_from_visibility: Resetting cellsize %f radians to criticalcellsize %f radians" % (
             cellsize, criticalcellsize))
         cellsize = criticalcellsize
-    pol_frame = get_parameter(kwargs, "polarisation_frame", PolarisationFrame("stokesI"))
-    inpol = pol_frame.npol
+    inpol = polarisation_frame.npol
     
     # Now we can define the WCS, which is a convenient place to hold the info above
     # Beware of python indexing order! wcs and the array have opposite ordering
@@ -424,14 +421,14 @@ def create_image_from_visibility(vis, **kwargs) -> Image:
         "Image phase centre [npixel//2, npixel//2] should be %s, actually is %s" % \
         (str(imagecentre), str(direction_centre))
     
-    w.wcs.radesys = get_parameter(kwargs, 'frame', 'ICRS')
-    w.wcs.equinox = get_parameter(kwargs, 'equinox', 2000.0)
+    w.wcs.radesys = frame
+    w.wcs.equinox = equinox
     
-    return create_image_from_array(numpy.zeros(shape), wcs=w, polarisation_frame=pol_frame)
+    return create_image_from_array(numpy.zeros(shape), wcs=w, polarisation_frame=polarisation_frame)
 
 
 def residual_image(vis: Visibility, model: Image, invert_residual=invert_2d, predict_residual=predict_2d,
-                   **kwargs) -> Image:
+                   arl_config='arl_config.ini') -> Image:
     """Calculate residual image and visibility
 
     :param vis: Visibility to be inverted
@@ -441,7 +438,7 @@ def residual_image(vis: Visibility, model: Image, invert_residual=invert_2d, pre
     :return: residual visibility, residual image, sum of weights
     """
     visres = copy_visibility(vis, zero=True)
-    visres = predict_residual(visres, model, **kwargs)
+    visres = predict_residual(visres, model, arl_config=arl_config)
     visres.data['vis'] = vis.data['vis'] - visres.data['vis']
-    dirty, sumwt = invert_residual(visres, model, dopsf=False, **kwargs)
+    dirty, sumwt = invert_residual(visres, model, dopsf=False, arl_config=arl_config)
     return visres, dirty, sumwt

@@ -100,7 +100,7 @@ def trial_case(results, seed=180555, context='wstack', nworkers=8, threads_per_w
     :param rmax: See create_simulate_vis_graph
     :param facets: Number of facets to use
     :param wprojection_planes: Number of wprojection planes to use
-    :param kwargs:
+    :param arl_config:
     :return: results dictionary
     """
     

@@ -18,7 +18,8 @@ from arl.visibility.coalesce import convert_blockvisibility_to_visibility
 
 log = logging.getLogger(__name__)
 
-def ical(block_vis: BlockVisibility, model: Image, components=None, context='2d', controls=None, **kwargs):
+def ical(block_vis: BlockVisibility, model: Image, components=None, context='2d', controls=None,
+         arl_config='arl_config.ini'):
     """ Post observation image, deconvolve, and self-calibrate
    
     :param vis:
@@ -28,13 +29,13 @@ def ical(block_vis: BlockVisibility, model: Image, components=None, context='2d'
     :param controls: Calibration controls dictionary
     :return: model, residual, restored
     """
-    nmajor = get_parameter(kwargs, 'nmajor', 5)
+    nmajor = get_parameter(arl_config, 'nmajor', 5)
     log.info("ical: Performing %d major cycles" % nmajor)
     
-    do_selfcal = get_parameter(kwargs, "do_selfcal", False)
+    do_selfcal = get_parameter(arl_config, "do_selfcal", False)
 
     if controls is None:
-        controls = create_calibration_controls(**kwargs)
+        controls = create_calibration_controls(arl_config)
     
     # The model is added to each major cycle and then the visibilities are
     # calculated from the full model
@@ -44,7 +45,7 @@ def ical(block_vis: BlockVisibility, model: Image, components=None, context='2d'
     vispred.data['vis'][...] = 0.0
     visres = copy_visibility(vispred)
     
-    vispred = predict_function(vispred, model, context=context, **kwargs)
+    vispred = predict_function(vispred, model, context=context, arl_config=arl_config)
     
     if components is not None:
         vispred = predict_skycomponent_visibility(vispred, components)
@@ -53,38 +54,38 @@ def ical(block_vis: BlockVisibility, model: Image, components=None, context='2d'
         vis, gaintables = calibrate_function(vis, vispred, 'TGB', controls, iteration=-1)
     
     visres.data['vis'] = vis.data['vis'] - vispred.data['vis']
-    dirty, sumwt = invert_function(visres, model, context=context, **kwargs)
+    dirty, sumwt = invert_function(visres, model, context=context, arl_config=arl_config)
     log.info("Maximum in residual image is %.6f" % (numpy.max(numpy.abs(dirty.data))))
     
-    psf, sumwt = invert_function(visres, model, dopsf=True, context=context, **kwargs)
+    psf, sumwt = invert_function(visres, model, dopsf=True, context=context, arl_config=arl_config)
     
-    thresh = get_parameter(kwargs, "threshold", 0.0)
+    threshold = get_parameter(arl_config, "threshold", 0.0)
     
     for i in range(nmajor):
         log.info("ical: Start of major cycle %d of %d" % (i, nmajor))
-        cc, res = deconvolve_cube(dirty, psf, **kwargs)
+        cc, res = deconvolve_cube(dirty, psf, arl_config=arl_config)
         model.data += cc.data
         vispred.data['vis'][...] = 0.0
-        vispred = predict_function(vispred, model, context=context, **kwargs)
+        vispred = predict_function(vispred, model, context=context, arl_config=arl_config)
         if do_selfcal:
             vis, gaintables = calibrate_function(vis, vispred, 'TGB', controls, iteration=i)
         visres.data['vis'] = vis.data['vis'] - vispred.data['vis']
         
-        dirty, sumwt = invert_function(visres, model, context=context, **kwargs)
+        dirty, sumwt = invert_function(visres, model, context=context, arl_config=arl_config)
         log.info("Maximum in residual image is %s" % (numpy.max(numpy.abs(dirty.data))))
-        if numpy.abs(dirty.data).max() < 1.1 * thresh:
-            log.info("ical: Reached stopping threshold %.6f Jy" % thresh)
+        if numpy.abs(dirty.data).max() < 1.1 * threshold:
+            log.info("ical: Reached stopping threshold %.6f Jy" % threshold)
             break
         log.info("ical: End of major cycle")
     
     log.info("ical: End of major cycles")
-    restored = restore_cube(model, psf, dirty, **kwargs)
+    restored = restore_cube(model, psf, dirty, arl_config=arl_config)
     
     return model, dirty, restored
 
 
 def continuum_imaging(vis: BlockVisibility, model: Image, components=None, context='2d',
-                      **kwargs) -> (Image, Image, Image):
+                      arl_config='arl_config.ini') -> (Image, Image, Image):
     """Continuum imaging from calibrated (DDE and DIE) and coalesced data
 
     The model image is used as the starting point, and also to determine the imagesize and sampling. Components
@@ -95,14 +96,14 @@ def continuum_imaging(vis: BlockVisibility, model: Image, components=None, conte
     :param vis: BlockVisibility
     :param model: model image
     :param components: Component-based sky model
-    :param kwargs: Parameters
+    :param arl_config: Parameters
     :return:
     """
-    return ical(vis, model, components=components, context=context, do_selfcal=False, **kwargs)
+    return ical(vis, model, components=components, context=context, do_selfcal=False, arl_config=arl_config)
 
 
 def spectral_line_imaging(vis: BlockVisibility, model: Image, continuum_model: Image = None, continuum_components=None,
-                          context='2d', **kwargs) -> (Image, Image, Image):
+                          context='2d', arl_config='arl_config.ini') -> (Image, Image, Image):
     """Spectral line imaging from calibrated (DIE) data
     
     A continuum model can be subtracted, and the residual image deconvolved.
@@ -119,19 +120,19 @@ def spectral_line_imaging(vis: BlockVisibility, model: Image, continuum_model: I
     
     vis_no_continuum = copy_visibility(vis)
     if continuum_model is not None:
-        vis_no_continuum = predict_function(vis_no_continuum, continuum_model, context=context, **kwargs)
+        vis_no_continuum = predict_function(vis_no_continuum, continuum_model, context=context, arl_config=arl_config)
     if continuum_components is not None:
         vis_no_continuum = predict_skycomponent_visibility(vis_no_continuum, continuum_components)
     vis_no_continuum.data['vis'] = vis.data['vis'] - vis_no_continuum.data['vis']
     
     log.info("spectral_line_imaging: Deconvolving continuum subtracted visibility")
-    return ical(vis_no_continuum.data, model, components=None, context=context, do_selfcal=False, **kwargs)
+    return ical(vis_no_continuum.data, model, components=None, context=context, do_selfcal=False, arl_config=arl_config)
 
 
-def fast_imaging(**kwargs) -> (Image, Image, Image):
+def fast_imaging(arl_config) -> (Image, Image, Image):
     """Fast imaging from calibrated (DIE only) data
 
-    :param kwargs: Dictionary containing parameters
+    :param arl_config: Dictionary containing parameters
     :return:
     """
     # TODO: implement
@@ -139,10 +140,10 @@ def fast_imaging(**kwargs) -> (Image, Image, Image):
     return True
 
 
-def eor(**kwargs) -> (Image, Image, Image):
+def eor(arl_config) -> (Image, Image, Image):
     """eor calibration and imaging
     
-    :param kwargs: Dictionary containing parameters
+    :param arl_config: Dictionary containing parameters
     :return:
     """
     # TODO: implement
@@ -150,7 +151,7 @@ def eor(**kwargs) -> (Image, Image, Image):
     return True
 
 
-def rcal(vis: BlockVisibility, components, **kwargs) -> GainTable:
+def rcal(vis: BlockVisibility, components, arl_config='arl_config.ini') -> GainTable:
     """ Real-time calibration pipeline.
 
     Reads visibilities through a BlockVisibility iterator, calculates model visibilities according to a
@@ -159,7 +160,7 @@ def rcal(vis: BlockVisibility, components, **kwargs) -> GainTable:
 
     :param vis: Visibility or Union(Visibility, Iterable)
     :param components: Component-based sky model
-    :param kwargs: Parameters
+    :param arl_config: Parameters
     :return: gaintable
    """
     
@@ -170,5 +171,5 @@ def rcal(vis: BlockVisibility, components, **kwargs) -> GainTable:
     for ichunk, vischunk in enumerate(vis):
         vispred = copy_visibility(vischunk, zero=True)
         vispred = predict_skycomponent_visibility(vispred, components)
-        gt = solve_gaintable(vischunk, vispred, **kwargs)
+        gt = solve_gaintable(vischunk, vispred, arl_config=arl_config)
         yield gt

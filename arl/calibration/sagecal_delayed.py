@@ -54,7 +54,7 @@ from arl.visibility.operations import copy_visibility
 log = logging.getLogger(__name__)
 
 
-def create_initialise_sagecal_thetas_graph(vis_graph, comps_graph, **kwargs):
+def create_initialise_sagecal_thetas_graph(vis_graph, comps_graph, arl_config='arl_config.ini'):
     """Create the thetas
 
     Create the data model for each window, from the visibility and the existing components
@@ -65,20 +65,20 @@ def create_initialise_sagecal_thetas_graph(vis_graph, comps_graph, **kwargs):
     """
     
     def create_theta(vis, comp):
-        gt = create_gaintable_from_blockvisibility(vis, **kwargs)
+        gt = create_gaintable_from_blockvisibility(vis, arl_config=arl_config)
         return (copy_skycomponent(comp), copy_gaintable(gt))
     
     return [delayed(create_theta, nout=len(comps_graph))(vis_graph, comps[1]) for comps in enumerate(comps_graph)]
 
 
-def create_sagecal_e_step_graph(vis_graph, evis_all_graph, theta_graph, **kwargs):
+def create_sagecal_e_step_graph(vis_graph, evis_all_graph, theta_graph, arl_config='arl_config.ini'):
     """Calculates E step in equation A12
 
     This is the data model for this window plus the difference between observed data and summed data models
 
     :param evis_all: Sum data models
     :param theta: Theta element being fit
-    :param kwargs:
+    :param arl_config:
     :return: Data model (i.e. visibility) for this theta
     """
     
@@ -104,7 +104,7 @@ def create_sagecal_e_all_graph(vis_graph, thetas_graph):
 
     :param vis: Visibility
     :param thetas: list of the thetas
-    :param kwargs:
+    :param arl_config:
     :return: Sum of data models (i.e. a single BlockVisibility)
     """
     
@@ -119,25 +119,25 @@ def create_sagecal_e_all_graph(vis_graph, thetas_graph):
     return delayed(sum_predict_results, nout=1)(evis_graph)
 
 
-def create_sagecal_m_step_graph(evis_graph, theta_graph, **kwargs):
+def create_sagecal_m_step_graph(evis_graph, theta_graph, arl_config='arl_config.ini'):
     """Calculates M step in equation A13
 
     This maximises the likelihood of the theta parameters given the existing data model. Note that these are done
     separately rather than jointly.
 
     :param theta:
-    :param kwargs:
+    :param arl_config:
     :return:
     """
     
     def make_theta(ev, th):
-        return (sagecal_fit_component(ev, th, **kwargs),
-                sagecal_fit_gaintable(ev, th, **kwargs))
+        return (sagecal_fit_component(ev, th, arl_config=arl_config),
+                sagecal_fit_gaintable(ev, th, arl_config=arl_config))
     
     return [delayed(make_theta)(evis_graph[i], theta_graph[i]) for i, _ in enumerate(evis_graph)]
 
 
-def create_sagecal_solve_graph(vis_graph, components_graph, niter=10, tol=1e-8, gain=0.25, **kwargs):
+def create_sagecal_solve_graph(vis_graph, components_graph, niter=10, tol=1e-8, gain=0.25, arl_config='arl_config.ini'):
     """ Solve using SageCal, dask.delayed wrapper
 
     Solve by iterating, performing E step and M step.
@@ -145,15 +145,15 @@ def create_sagecal_solve_graph(vis_graph, components_graph, niter=10, tol=1e-8, 
     :param vis: Initial visibility
     :param components: Initial components to be used
     :param gaintables: Initial gain tables to be used
-    :param kwargs:
+    :param arl_config:
     :return: A dask graph to calculate the individual data models and the residual visibility
     """
-    theta_graph = create_initialise_sagecal_thetas_graph(vis_graph, components_graph, **kwargs)
+    theta_graph = create_initialise_sagecal_thetas_graph(vis_graph, components_graph, arl_config=arl_config)
     
     for iter in range(niter):
         evis_all_graph = create_sagecal_e_all_graph(vis_graph, theta_graph)
-        evis_graph = create_sagecal_e_step_graph(vis_graph, evis_all_graph, theta_graph, gain=gain, **kwargs)
-        new_theta_graph = create_sagecal_m_step_graph(evis_graph, theta_graph, **kwargs)
+        evis_graph = create_sagecal_e_step_graph(vis_graph, evis_all_graph, theta_graph, gain=gain, arl_config=arl_config)
+        new_theta_graph = create_sagecal_m_step_graph(evis_graph, theta_graph, arl_config=arl_config)
         theta_graph = new_theta_graph
     
     final_vis_graph = create_sagecal_e_all_graph(vis_graph, theta_graph)

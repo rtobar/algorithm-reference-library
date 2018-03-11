@@ -78,7 +78,7 @@ def fit_uvwplane(vis: Visibility, remove=False) -> (Image, float, float):
 
 
 def predict_timeslice_single(vis: Visibility, model: Image, predict=predict_2d_base, remove=True,
-                             **kwargs) -> Visibility:
+                             arl_config='arl_config.ini') -> Visibility:
     """ Predict using a single time slices.
     
     This fits a single plane and corrects the image geometry.
@@ -96,7 +96,7 @@ def predict_timeslice_single(vis: Visibility, model: Image, predict=predict_2d_b
     vis.data['vis'] *= 0.0
     
     if not isinstance(vis, Visibility):
-        avis = coalesce_visibility(vis, **kwargs)
+        avis = coalesce_visibility(vis, arl_config=arl_config)
     else:
         avis = vis
 
@@ -121,7 +121,7 @@ def predict_timeslice_single(vis: Visibility, model: Image, predict=predict_2d_b
                          fill_value=0.0,
                          rescale=True).reshape(workimage.data[chan, pol, ...].shape)
 
-    avis = predict(avis, workimage, **kwargs)
+    avis = predict(avis, workimage, arl_config=arl_config)
     
     return avis
 
@@ -154,7 +154,7 @@ def lm_distortion(im: Image, a, b) -> (numpy.ndarray, numpy.ndarray, numpy.ndarr
 
 
 def invert_timeslice_single(vis: Visibility, im: Image, dopsf, normalize=True,
-                            **kwargs) -> (Image, numpy.ndarray):
+                            arl_config='arl_config.ini') -> (Image, numpy.ndarray):
     """Process single time slice
     
     Extracted for re-use in parallel version
@@ -166,7 +166,7 @@ def invert_timeslice_single(vis: Visibility, im: Image, dopsf, normalize=True,
     inchan, inpol, ny, nx = im.shape
 
     if not isinstance(vis, Visibility):
-        avis = coalesce_visibility(vis, **kwargs)
+        avis = coalesce_visibility(vis, arl_config=arl_config)
     else:
         avis = vis
 
@@ -174,7 +174,7 @@ def invert_timeslice_single(vis: Visibility, im: Image, dopsf, normalize=True,
 
     avis, p, q = fit_uvwplane(avis, remove=True)
     
-    workimage, sumwt = invert_2d_base(avis, im, dopsf, normalize=normalize, **kwargs)
+    workimage, sumwt = invert_2d_base(avis, im, dopsf, normalize=normalize, arl_config=arl_config)
 
     finalimage = create_empty_image_like(im)
     

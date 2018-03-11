@@ -76,8 +76,7 @@ class TestWeighting(unittest.TestCase):
         
         # Create model
         self.model = create_image_from_visibility(self.componentvis, npixel=512, cellsize=0.001,
-                                                  nchan=len(self.frequency),
-                                                  polarisation_frame=self.image_pol)
+                                                  nchan=len(self.frequency))
 
     def test_weighting(self):
         self.actualSetUp()
@@ -93,7 +92,7 @@ class TestWeighting(unittest.TestCase):
     def test_tapering_Gaussian(self):
         self.actualSetUp()
         size_required = 0.01
-        self.componentvis, _, _ = weight_visibility(self.componentvis, self.model, algoritm='uniform')
+        self.componentvis, _, _ = weight_visibility(self.componentvis, self.model, weighting='uniform')
         self.componentvis = taper_visibility_gaussian(self.componentvis, beam=size_required)
         psf, sumwt = invert_2d(self.componentvis, self.model, dopsf=True)
         export_image_to_fits(psf, '%s/test_weighting_gaussian_taper_psf.fits' % self.dir)

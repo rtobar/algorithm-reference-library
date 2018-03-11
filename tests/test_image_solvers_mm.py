@@ -45,8 +45,7 @@ class TestImageSolversMM(unittest.TestCase):
         self.vis = predict_2d(self.vis, self.model)
         assert numpy.max(numpy.abs(self.vis.vis)) > 0.0
         export_image_to_fits(self.model, '%s/test_solve_image_mm_model.fits' % (self.dir))
-        self.bigmodel = create_image_from_visibility(self.vis, cellsize=0.0015, npixel=512,
-                                                     frequency=self.frequency)
+        self.bigmodel = create_image_from_visibility(self.vis, npixel=512, cellsize=0.0015, frequency=self.frequency)
         
         
     def test_deconvolve_and_restore_cube_mmclean(self):

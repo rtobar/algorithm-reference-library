@@ -1,23 +1,20 @@
-"""We use the standard kwargs mechanism for arguments. For example::
+"""We use the standard configparser mechanism for arguments. For example::
 
-    kernelname = get_parameter(kwargs, "kernel", "2d")
-    oversampling = get_parameter(kwargs, "oversampling", 8)
-    padding = get_parameter(kwargs, "padding", 2)
+    kernelname = get_parameter(arl_config, "kernel", "2d")
+    oversampling = get_parameter(arl_config, "oversampling", 8)
+    padding = get_parameter(arl_config, "padding", 2)
 
 The kwargs may need to be passed down to called functions.
 
 All functions possess an API which is always of the form::
 
-      def processing_function(idatastruct1, idatastruct2, ..., *kwargs):
+      def processing_function(idatastruct1, idatastruct2, ..., arl_config='arl_config.ini'):
          return odatastruct1, odatastruct2,... other
 
-Processing parameters are passed via the standard Python kwargs approach.
-
 Inside a function, the values are retrieved can be accessed directly from the
-kwargs dictionary, or if a default is needed a function can be used::
+arl_config.ini, or if a default is needed a function can be used::
 
-    log = get_parameter(kwargs, 'log', None)
-    vis = get_parameter(kwargs, 'visibility', None)
+    log = get_parameter(arl_config, 'log', None)
 
 Function parameters should obey a consistent naming convention:
 
@@ -55,6 +52,7 @@ spectral_mode           Visibility processing mode          'mfs' or 'channel'
 
 import logging
 import os
+import configparser
 
 log = logging.getLogger(__name__)
 
@@ -74,21 +72,39 @@ def arl_path(path):
     return os.path.join(arlhome, path)
 
 
-def get_parameter(kwargs, key, default=None):
+def get_parameter(arl_config, key, default=None, section='DEFAULT'):
     """ Get a specified named value for this (calling) function
 
-    The parameter is searched for in kwargs
+    The configfile is searched for in kwargs
 
-    :param kwargs: Parameter dictionary
+    :param config: Parameter dictionary
     :param key: Key e.g. 'loop_gain'
     :param default: Default value
     :return: result
     """
 
-    if kwargs is None:
+    if arl_config is None:
         return default
 
-    value = default
-    if key in kwargs.keys():
-        value = kwargs[key]
-    return value
+    config = configparser.ConfigParser()
+    config.read(arl_config)
+    if section in config.keys():
+        return config[section].get(key, default)
+    else:
+        return default
+
+def set_parameters(arl_config, dict, section='DEFAULT'):
+    """ Get a specified named value for this (calling) function
+
+    The configfile is searched for in kwargs
+
+    :param arl_config: A config file
+    :param dict:, dictionary of key:values
+    :param section: Section to write into
+    :return: result
+    """
+    config = configparser.ConfigParser()
+    config.read(arl_config)
+    config[section] = dict
+    with open(arl_config, 'w') as configfile:
+        config.write(configfile)

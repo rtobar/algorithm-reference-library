@@ -129,7 +129,7 @@ def create_blockvisibility(config: Configuration,
                            polarisation_frame: PolarisationFrame = None,
                            integration_time=1.0,
                            channel_bandwidth=1e6,
-                           zerow=False, **kwargs) -> BlockVisibility:
+                           zerow=False, arl_config='arl_config.ini') -> BlockVisibility:
     """ Create a BlockVisibility from Configuration, hour angles, and direction of source
 
     Note that we keep track of the integration time for BDA purposes

@@ -112,7 +112,7 @@ class TestImagingDelayed(unittest.TestCase):
     
     def _predict_base(self, context='2d', extra=''):
         vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
-        vis_graph_list = create_predict_graph(vis_graph_list, self.model_graph, context=context, **self.params)
+        vis_graph_list = create_predict_graph(vis_graph_list, self.model_graph, context=context, arl_config=self.ini)
         if self.compute:
             qa = qa_visibility(vis_graph_list[0].compute(), context='predict_%s%s' % (context, extra))
             assert qa.data['maxabs'] > 0.0, str(qa)
@@ -121,7 +121,7 @@ class TestImagingDelayed(unittest.TestCase):
         dirty_graph = create_invert_graph(self.vis_graph_list, self.model_graph,
                                           context=context,
                                           dopsf=False, normalize=True,
-                                          **self.params)
+                                          arl_config=self.ini)
         
         if self.compute:
             dirty = dirty_graph[0].compute()

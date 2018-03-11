@@ -51,21 +51,19 @@ class TestPipelinesGenericDask(unittest.TestCase):
                                                       cellsize=0.001,
                                                       polarisation_frame=PolarisationFrame('stokesI'))
     
-    def test_create_generic_blockvisibility_graph(self):
-        self.blockvis = [create_blockvisibility(self.lowcore, self.times, self.frequency,
-                                                phasecentre=self.phasecentre,
-                                                channel_bandwidth=self.channel_bandwidth,
-                                                weight=1.0,
-                                                polarisation_frame=PolarisationFrame('stokesI'))]
-        self.blockvis = \
-            create_generic_blockvisibility_graph(predict_skycomponent_visibility,
-                                                 vis_graph_list=self.blockvis,
-                                                 sc=self.comp)[0].compute()
-        
-        assert numpy.max(numpy.abs(self.blockvis[0].vis)) > 0.0
-
+    # def test_create_generic_blockvisibility_graph(self):
+    #     self.blockvis = [create_blockvisibility(self.lowcore, self.times, self.frequency,
+    #                                             phasecentre=self.phasecentre,
+    #                                             channel_bandwidth=self.channel_bandwidth,
+    #                                             weight=1.0,
+    #                                             polarisation_frame=PolarisationFrame('stokesI'))]
+    #     self.blockvis = create_generic_blockvisibility_graph(predict_skycomponent_visibility,
+    #                                          vis_graph_list=self.blockvis,
+    #                                          sc=self.comp)[0].compute()
+    #     assert numpy.max(numpy.abs(self.blockvis[0].vis)) > 0.0
+    #
     def test_create_generic_image_iterator_graph(self):
-        def imagerooter(im, **kwargs):
+        def imagerooter(im):
             im.data = numpy.sqrt(numpy.abs(im.data))
             return im
     
@@ -74,7 +72,7 @@ class TestPipelinesGenericDask(unittest.TestCase):
         numpy.testing.assert_array_almost_equal_nulp(root.data ** 2, numpy.abs(self.image.data), 7)
 
     def test_create_generic_image_graph(self):
-        def imagerooter(im, **kwargs):
+        def imagerooter(im):
             im.data = numpy.sqrt(numpy.abs(im.data))
             return im
     

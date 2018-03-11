@@ -37,30 +37,27 @@ class TestFTProcessorParams(unittest.TestCase):
                                      phasecentre=self.phasecentre, weight=1.0,
                                      polarisation_frame=PolarisationFrame('stokesI'),
                                      channel_bandwidth=self.channel_bandwidth)
-        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001,
-                                                  nchan=self.vnchan,
-                                                  frequency=self.startfrequency)
+        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001, frequency=self.startfrequency,
+                                                  nchan=self.vnchan)
 
     def test_get_frequency_map_channel(self):
-        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001,
-                                                  nchan=self.vnchan,
-                                                  frequency=self.startfrequency)
+        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001, frequency=self.startfrequency,
+                                                  nchan=self.vnchan)
         spectral_mode, vfrequency_map = get_frequency_map(self.vis, self.model)
         assert numpy.max(vfrequency_map) == self.model.nchan - 1
         assert numpy.min(vfrequency_map) == 0
         assert spectral_mode == 'channel'
 
     def test_get_frequency_map_different_channel(self):
-        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001,
-                                                  frequency=self.startfrequency, nchan=3,
-                                                  channel_bandwidth=2e7)
+        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001, frequency=self.startfrequency,
+                                                  channel_bandwidth=2e7, nchan=3)
         spectral_mode, vfrequency_map = get_frequency_map(self.vis, self.model)
         assert numpy.max(vfrequency_map) == self.model.nchan - 1
         assert spectral_mode == 'channel'
 
     def test_get_frequency_map_mfs(self):
-        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001, nchan=1,
-                                                  frequency=self.startfrequency)
+        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001, frequency=self.startfrequency,
+                                                  nchan=1)
         spectral_mode, vfrequency_map = get_frequency_map(self.vis, self.model)
         assert numpy.max(vfrequency_map) == 0
         assert spectral_mode == 'mfs'

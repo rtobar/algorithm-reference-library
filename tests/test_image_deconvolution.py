@@ -42,8 +42,8 @@ class TestImageDeconvolution(unittest.TestCase):
                                             frequency=self.frequency)
         self.vis = predict_2d(self.vis, self.test_model)
         assert numpy.max(numpy.abs(self.vis.vis)) > 0.0
-        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001,
-                                                  polarisation_frame=PolarisationFrame('stokesI'))
+
+        self.model = create_image_from_visibility(self.vis, npixel=512, cellsize=0.001)
         self.dirty, sumwt = invert_2d(self.vis, self.model)
         self.psf, sumwt = invert_2d(self.vis, self.model, dopsf=True)
         window = numpy.zeros(shape=self.model.shape, dtype=numpy.bool)

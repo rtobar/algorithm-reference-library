@@ -10,13 +10,12 @@ There are two classes of functions:
 import numpy
 
 from arl.data.data_models import Visibility, Image
-from arl.data.parameters import get_parameter
 from arl.fourier_transforms.convolutional_gridding import weight_gridding
 from arl.imaging import get_polarisation_map, get_uvw_map
 from arl.imaging.params import get_frequency_map
 
 
-def weight_visibility(vis: Visibility, im: Image, **kwargs) -> Visibility:
+def weight_visibility(vis: Visibility, im: Image, weighting='uniform', briggs=1.0, padding=False) -> Visibility:
     """ Reweight the visibility data using a selected algorithm
 
     Imaging uses the column "imaging_weight" when imaging. This function sets that column using a
@@ -35,7 +34,6 @@ def weight_visibility(vis: Visibility, im: Image, **kwargs) -> Visibility:
     """
     assert isinstance(vis, Visibility), "vis is not a Visibility: %r" % vis
     
-    assert get_parameter(kwargs, "padding", False) is False
     spectral_mode, vfrequencymap = get_frequency_map(vis, im)
     polarisation_mode, vpolarisationmap = get_polarisation_map(vis, im)
     uvw_mode, shape, padding, vuvwmap = get_uvw_map(vis, im)
@@ -43,7 +41,6 @@ def weight_visibility(vis: Visibility, im: Image, **kwargs) -> Visibility:
     density = None
     densitygrid = None
     
-    weighting = get_parameter(kwargs, "weighting", "uniform")
     vis.data['imaging_weight'], density, densitygrid = weight_gridding(im.data.shape, vis.data['weight'], vuvwmap,
                                                                        vfrequencymap, vpolarisationmap, weighting)
     
@@ -61,7 +58,7 @@ def taper_visibility_gaussian(vis: Visibility, beam=None) -> Visibility:
     :return: visibility with imaging_weight column modified
     """
     assert isinstance(vis, Visibility), "vis is not a Visibility: %r" % vis
-
+    
     if beam is None:
         raise ValueError("Beam size not specified for Gaussian taper")
     uvdistsq = vis.u ** 2 + vis.v ** 2
@@ -70,7 +67,7 @@ def taper_visibility_gaussian(vis: Visibility, beam=None) -> Visibility:
     wt = numpy.exp(-scale_factor * uvdistsq)
     for row in range(vis.nvis):
         vis.data['imaging_weight'][row, ...] = vis.imaging_weight[row, ...] * wt[row]
-
+    
     return vis
 
 
@@ -99,7 +96,7 @@ def taper_visibility_tukey(vis: Visibility, tukey=0.1) -> Visibility:
     wt = numpy.array([tukey_filter(uv, tukey) for uv in uvdist])
     for row in range(vis.nvis):
         vis.data['imaging_weight'][row, ...] = vis.imaging_weight[row, ...] * wt[row]
-   
+    
     return vis
 
 

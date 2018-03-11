@@ -12,6 +12,7 @@ If images constructed from slices in w are added after applying a w-dependent im
 import numpy
 
 from arl.data.data_models import Visibility, Image, BlockVisibility
+from arl.data.parameters import set_parameters
 
 from arl.image.operations import copy_image
 from arl.visibility.base import copy_visibility
@@ -24,7 +25,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def predict_wstack_single(vis, model, remove=True, **kwargs) -> Visibility:
+def predict_wstack_single(vis, model, remove=True, arl_config='arl_config.ini') -> Visibility:
     """ Predict using a single w slices.
     
     This processes a single w plane, rotating out the w beam for the average w
@@ -36,7 +37,7 @@ def predict_wstack_single(vis, model, remove=True, **kwargs) -> Visibility:
 
     if not isinstance(vis, Visibility):
         log.debug("predict_wstack_single: Coalescing")
-        avis = coalesce_visibility(vis, **kwargs)
+        avis = coalesce_visibility(vis, arl_config=arl_config)
     else:
         avis = vis
         
@@ -54,11 +55,11 @@ def predict_wstack_single(vis, model, remove=True, **kwargs) -> Visibility:
     
     # Do the real part
     workimage.data = w_beam.data.real * model.data
-    avis = predict_2d_base(avis, workimage, **kwargs)
+    avis = predict_2d_base(avis, workimage, arl_config=arl_config)
     
     # and now the imaginary part
     workimage.data = w_beam.data.imag * model.data
-    tempvis = predict_2d_base(tempvis, workimage, **kwargs)
+    tempvis = predict_2d_base(tempvis, workimage, arl_config=arl_config)
     avis.data['vis'] -= 1j * tempvis.data['vis']
     
     if not remove:
@@ -72,7 +73,7 @@ def predict_wstack_single(vis, model, remove=True, **kwargs) -> Visibility:
 
 
 def invert_wstack_single(vis: Visibility, im: Image, dopsf, normalize=True, remove=True,
-                         **kwargs) -> (Image, numpy.ndarray):
+                         arl_config='arl_config.ini') -> (Image, numpy.ndarray):
     """Process single w slice
     
     :param vis: Visibility to be inverted
@@ -82,18 +83,16 @@ def invert_wstack_single(vis: Visibility, im: Image, dopsf, normalize=True, remo
     """
     log.debug("invert_wstack_single: predicting using single w slice")
     
-    kwargs['imaginary'] = True
+    d = {'imaginary': True, 'vis_slices':1, 'wstack':numpy.max(numpy.abs(vis.w))}
+    set_parameters(arl_config, d)
     
     assert isinstance(vis, Visibility), vis
-    
-    kwargs['vis_slices'] = 1
-    kwargs['wstack'] = numpy.max(numpy.abs(vis.w))
     
     # We might want to do wprojection so we remove the average w
     w_average = numpy.average(vis.w)
     vis.data['uvw'][..., 2] -= w_average
     
-    reWorkimage, sumwt, imWorkimage = invert_2d_base(vis, im, dopsf, normalize=normalize, **kwargs)
+    reWorkimage, sumwt, imWorkimage = invert_2d_base(vis, im, dopsf, normalize=normalize, arl_config=arl_config)
     
     if not remove:
         vis.data['uvw'][..., 2] += w_average

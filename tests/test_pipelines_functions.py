@@ -71,9 +71,8 @@ class TestPipelinesFunctions(unittest.TestCase):
                                    weight=1.0, phasecentre=phasecentre,
                                    polarisation_frame=PolarisationFrame("stokesI"))
         cellsize = 0.001
-        model = create_image_from_visibility(vt, npixel=self.npixel, cellsize=cellsize, npol=1,
-                                             frequency=frequency, phasecentre=phasecentre,
-                                             polarisation_frame=PolarisationFrame("stokesI"))
+        model = create_image_from_visibility(vt, npixel=self.npixel, cellsize=cellsize, phasecentre=phasecentre,
+                                             frequency=frequency)
         nchan = len(self.frequency)
         flux = numpy.array(nchan * [[100.0]])
         facets = 4

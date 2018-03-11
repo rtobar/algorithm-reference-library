@@ -5,7 +5,7 @@ thus allowing construction of graphs.
 
 For example, consider a trivial example to take the square root of an image::
 
-        def imagerooter(im, **kwargs):
+        def imagerooter(im, arl_config='arl_config.ini'):
             im.data = numpy.sqrt(numpy.abs(im.data))
             return im
         root = create_generic_image_graph(imagerooter, myimage,  image_raster_iter, facets=4).compute()
@@ -24,18 +24,18 @@ from arl.image.gather_scatter import image_gather_facets, image_scatter_facets
 
 
 def create_generic_blockvisibility_graph(visfunction, vis_graph_list, additive=True, *args,
-                                         **kwargs):
+                                         arl_config):
     """ Definition of interface for create_generic_blockvisibility_graph_visfunction.
 
     :func visfunction: Function to be applied
     :param vis_graph_list: List of vis_graphs
     :param additive: Add to existing visibility? (True)
     :param args:
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return: List of graphs
     """
     
-    def accumulate_results(results, **kwargs):
+    def accumulate_results(results, arl_config=arl_config):
         for i, result in enumerate(results):
             if additive:
                 vis_graph_list[i].data['vis'] += result.data['vis']
@@ -45,11 +45,12 @@ def create_generic_blockvisibility_graph(visfunction, vis_graph_list, additive=T
     
     results = list()
     for vis_graph in vis_graph_list:
-        results.append(delayed(visfunction, pure=True)(vis_graph, *args, **kwargs))
-    return [delayed(accumulate_results, pure=True)(results, **kwargs)]
+        results.append(delayed(visfunction, pure=True)(vis_graph, *args, arl_config=arl_config))
+    return [delayed(accumulate_results, pure=True)(results, arl_config=arl_config)]
 
 
-def create_generic_image_iterator_graph(imagefunction, im: Image, iterator, **kwargs) -> delayed:
+def create_generic_image_iterator_graph(imagefunction, im: Image, iterator, facets=1, arl_config='arl_config.ini') -> \
+        delayed:
     """ Definition of interface for create_generic_image_graph
     
     This generates a graph for imagefunction. Note that im cannot be a graph itself.
@@ -57,27 +58,27 @@ def create_generic_image_iterator_graph(imagefunction, im: Image, iterator, **kw
     :func imagefunction: Function to be applied to all pixels
     :param im: Image to be processed
     :param iterator: iterator e.g.   image_raster_iter
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return: graph
     """
     
-    def accumulate_results(results, **kwargs):
+    def accumulate_results(results):
         newim = copy_image(im)
         i = 0
-        for dpatch in iterator(newim, **kwargs):
+        for dpatch in iterator(newim, facets=facets):
             dpatch.data[...] = results[i].data[...]
             i += 1
         return newim
     
     results = list()
     
-    for dpatch in iterator(im, **kwargs):
-        results.append(delayed(imagefunction(copy_image(dpatch), **kwargs)))
+    for dpatch in iterator(im, facets=facets):
+        results.append(delayed(imagefunction(copy_image(dpatch))))
     
-    return delayed(accumulate_results, pure=True)(results, **kwargs)
+    return delayed(accumulate_results, pure=True)(results)
 
 
-def create_generic_image_graph(image_unary_function, im: Image, facets=4, **kwargs) -> delayed:
+def create_generic_image_graph(image_unary_function, im: Image, facets=4, arl_config='arl_config.ini'):
     """ Definition of interface for create_generic_image_graph using scatter/gather
 
     This generates a graph for imagefunction. Note that im cannot be a graph itself.
@@ -85,7 +86,7 @@ def create_generic_image_graph(image_unary_function, im: Image, facets=4, **kwar
     :func image_unary_function: Function to be applied to all pixels
     :param im: Image to be processed
     :param facets: Number of facets on each axis
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return: graph
     """
     output = delayed(create_empty_image_like, nout=1, pure=True)(im)

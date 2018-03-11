@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from arl.util.coordinate_support import lmn_to_skycoord, skycoord_to_lmn
 
 
-def fit_visibility(vis, sc, tol=1e-6, niter=20, verbose=False, method='trust-exact', **kwargs):
+def fit_visibility(vis, sc, tol=1e-6, niter=20, verbose=False, method='trust-exact', arl_config='arl_config.ini'):
     """Fit a single component to a visibility
     
     Uses the scipy.optimize.minimize function.
@@ -19,7 +19,7 @@ def fit_visibility(vis, sc, tol=1e-6, niter=20, verbose=False, method='trust-exa
     :param niter: Number of iterations
     :param verbose:
     :param method: 'CG', 'BFGS', 'Powell', 'trust-ncg', 'trust-exact', 'trust-krylov': default 'trust-exact'
-    :param kwargs:
+    :param arl_config:
     :return: component, convergence info as a dictionary
     """
     

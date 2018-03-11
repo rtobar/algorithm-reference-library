@@ -87,7 +87,8 @@ def imaging_context(context='2d'):
     return contexts[context]
 
 
-def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', inner=None, **kwargs):
+def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', inner=None,
+                    arl_config='arl_config.ini'):
     """ Invert using algorithm specified by context:
 
      * 2d: Two-dimensional transform
@@ -106,7 +107,7 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
     :param normalize: Normalize by the sum of weights (True)
     :param context: Imaging context e.g. '2d', 'timeslice', etc.
     :param inner: Inner loop 'vis'|'image'
-    :param kwargs:
+    :param arl_config:
     :return: Image, sum of weights
     """
     c = imaging_context(context)
@@ -117,7 +118,7 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
         inner = c['inner']
     
     if not isinstance(vis, Visibility):
-        svis = coalesce_visibility(vis, **kwargs)
+        svis = coalesce_visibility(vis)
     else:
         svis = vis
 
@@ -125,13 +126,14 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
 
     if inner == 'image':
         totalwt = None
-        for rows in vis_iter(svis, **kwargs):
+        for rows in vis_iter(svis, arl_config=arl_config):
             if numpy.sum(rows):
                 visslice = create_visibility_from_rows(svis, rows)
                 sumwt = 0.0
                 workimage = create_empty_image_like(im)
-                for dpatch in image_iter(workimage, **kwargs):
-                    result, sumwt = invert(visslice, dpatch, dopsf, normalize=False, **kwargs)
+                for dpatch in image_iter(workimage, arl_config=arl_config):
+                    result, sumwt = invert(visslice, dpatch, dopsf, normalize=False,
+                                           arl_config=arl_config)
                     # Ensure that we fill in the elements of dpatch instead of creating a new numpy arrray
                     dpatch.data[...] = result.data[...]
                 # Assume that sumwt is the same for all patches
@@ -144,12 +146,12 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
         # We assume that the weight is the same for all image iterations
         totalwt = None
         workimage = create_empty_image_like(im)
-        for dpatch in image_iter(workimage, **kwargs):
+        for dpatch in image_iter(workimage, arl_config=arl_config):
             totalwt = None
-            for rows in vis_iter(svis, **kwargs):
+            for rows in vis_iter(svis, arl_config=arl_config):
                 if numpy.sum(rows):
                     visslice = create_visibility_from_rows(svis, rows)
-                    result, sumwt = invert(visslice, dpatch, dopsf, normalize=False, **kwargs)
+                    result, sumwt = invert(visslice, dpatch, dopsf, normalize=False, arl_config=arl_config)
                     # Ensure that we fill in the elements of dpatch instead of creating a new numpy arrray
                     dpatch.data[...] += result.data[...]
                     if totalwt is None:
@@ -166,7 +168,7 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
     return resultimage, totalwt
 
 
-def predict_function(vis, model: Image, context='2d', inner=None, **kwargs) -> Visibility:
+def predict_function(vis, model: Image, context='2d', inner=None, arl_config='arl_config.ini') -> Visibility:
     """Predict visibilities using algorithm specified by context
     
      * 2d: Two-dimensional transform
@@ -183,7 +185,7 @@ def predict_function(vis, model: Image, context='2d', inner=None, **kwargs) -> V
     :param model: Model image, used to determine image characteristics
     :param context: Imaing context e.g. '2d', 'timeslice', etc.
     :param inner: Inner loop 'vis'|'image'
-    :param kwargs:
+    :param arl_config:
     :return:
 
 
@@ -196,30 +198,30 @@ def predict_function(vis, model: Image, context='2d', inner=None, **kwargs) -> V
         inner = c['inner']
 
     if not isinstance(vis, Visibility):
-        svis = coalesce_visibility(vis, **kwargs)
+        svis = coalesce_visibility(vis)
     else:
         svis = vis
     
     result = copy_visibility(vis, zero=True)
     
     if inner == 'image':
-        for rows in vis_iter(svis, **kwargs):
+        for rows in vis_iter(svis, arl_config=arl_config):
             if numpy.sum(rows):
                 visslice = create_visibility_from_rows(svis, rows)
                 visslice.data['vis'][...] = 0.0
                 # Iterate over images
-                for dpatch in image_iter(model, **kwargs):
+                for dpatch in image_iter(model, arl_config=arl_config):
                     result.data['vis'][...] = 0.0
-                    result = predict(visslice, dpatch, **kwargs)
+                    result = predict(visslice, dpatch, arl_config=arl_config)
                     svis.data['vis'][rows] += result.data['vis']
     else:
         # Iterate over images
-        for dpatch in image_iter(model, **kwargs):
-            for rows in vis_iter(svis, **kwargs):
+        for dpatch in image_iter(model, arl_config=arl_config):
+            for rows in vis_iter(svis, arl_config=arl_config):
                 if numpy.sum(rows):
                     visslice = create_visibility_from_rows(svis, rows)
                     result.data['vis'][...] = 0.0
-                    result = predict(visslice, dpatch, **kwargs)
+                    result = predict(visslice, dpatch, arl_config=arl_config)
                     svis.data['vis'][rows] += result.data['vis']
     
     return svis

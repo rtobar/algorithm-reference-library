@@ -126,7 +126,7 @@ def standard_kernel_list(vis: Visibility, shape, oversampling=8, support=3):
     return numpy.zeros_like(vis.w, dtype='int'), [anti_aliasing_calculate(shape, oversampling, support)[1]]
 
 
-def w_kernel_list(vis: Visibility, im: Image, oversampling=1, wstep=50.0, kernelwidth=16, **kwargs):
+def w_kernel_list(vis: Visibility, im: Image, oversampling=1, wstep=50.0, kernelwidth=16):
     """ Calculate w convolution kernels
     
     Uses create_w_term_like to calculate the w screen. This is exactly as wstacking does.
@@ -146,7 +146,7 @@ def w_kernel_list(vis: Visibility, im: Image, oversampling=1, wstep=50.0, kernel
 
     nchan, npol, ny, nx = im.shape
     gcf, _ = anti_aliasing_calculate((ny, nx))
-
+    
     assert oversampling % 2 == 0 or oversampling == 1, "oversampling must be unity or even"
     assert kernelwidth % 2 == 0, "kernelwidth must be even"
 
@@ -172,7 +172,7 @@ def w_kernel_list(vis: Visibility, im: Image, oversampling=1, wstep=50.0, kernel
     kernels = list()
     for w in w_list:
         # Make a w screen
-        wscreen = create_w_term_like(wtemplate, w, vis.phasecentre, **kwargs)
+        wscreen = create_w_term_like(wtemplate, w, vis.phasecentre)
         wscreen.data /= gcf
         assert numpy.max(numpy.abs(wscreen.data)) > 0.0, 'w screen is empty'
         wscreen_padded = pad_image(wscreen, padded_shape)
@@ -190,7 +190,7 @@ def w_kernel_list(vis: Visibility, im: Image, oversampling=1, wstep=50.0, kernel
     return kernel_indices, kernels
 
 
-def get_kernel_list(vis: Visibility, im: Image, **kwargs):
+def get_kernel_list(vis: Visibility, im: Image, arl_config='arl_config.ini'):
     """Get the list of kernels, one per visibility
     
     """
@@ -199,9 +199,9 @@ def get_kernel_list(vis: Visibility, im: Image, **kwargs):
     npixel = shape[3]
     cellsize = numpy.pi * im.wcs.wcs.cdelt[1] / 180.0
     
-    kernelname = get_parameter(kwargs, "kernel", "2d")
-    oversampling = get_parameter(kwargs, "oversampling", 8)
-    padding = get_parameter(kwargs, "padding", 2)
+    kernelname = get_parameter(arl_config, "kernel", "2d", 'imaging')
+    oversampling = get_parameter(arl_config, "oversampling", 8, 'imaging')
+    padding = get_parameter(arl_config, "padding", 2, 'imaging')
     
     gcf, _ = anti_aliasing_calculate((padding * npixel, padding * npixel), oversampling)
     
@@ -215,22 +215,24 @@ def get_kernel_list(vis: Visibility, im: Image, **kwargs):
         fov = cellsize * npixel * padding
         r_f = (cellsize * npixel / 2) ** 2 / abs(cellsize)
         log.debug("get_kernel_list: Fresnel number = %f" % (r_f))
-        delA = get_parameter(kwargs, 'wloss', 0.02)
+        delA = get_parameter(arl_config, 'wloss', 0.02)
         
         advice = advise_wide_field(vis, delA)
-        wstep = get_parameter(kwargs, 'wstep', advice['w_sampling_primary_beam'])
+        wstep = get_parameter(arl_config, 'wstep', advice['w_sampling_primary_beam'], 'imaging')
         
         log.debug("get_kernel_list: Using w projection with wstep = %f" % (wstep))
  
         # Now calculate the maximum support for the w kernel
-        kernelwidth = get_parameter(kwargs, "kernelwidth",
-                                    (2 * int(round(numpy.sin(0.5 * fov) * npixel * wabsmax * cellsize))))
+        kernelwidth = \
+            get_parameter(arl_config, "kernelwidth",
+                          (2 * int(round(numpy.sin(0.5 * fov) * npixel * wabsmax * cellsize))),
+                          'imaging')
         kernelwidth = max(kernelwidth, 8)
         assert kernelwidth % 2 == 0
         log.debug("get_kernel_list: Maximum w kernel full width = %d pixels" % (kernelwidth))
         padded_shape = [im.shape[0], im.shape[1], im.shape[2] * padding, im.shape[3] * padding]
 
-        remove_shift = get_parameter(kwargs, "remove_shift", True)
+        remove_shift = get_parameter(arl_config, "remove_shift", True, 'imaging')
         padded_image = pad_image(im, padded_shape)
         kernel_list = w_kernel_list(vis, padded_image, oversampling=oversampling, wstep=wstep,
                                     kernelwidth=kernelwidth, remove_shift=remove_shift)
@@ -251,7 +253,7 @@ def advise_wide_field(vis: Visibility, delA=0.02, oversampling_synthesised_beam=
     For example::
     
         advice = advise_wide_field(vis, delA)
-        wstep = get_parameter(kwargs, 'wstep', advice['w_sampling_primary_beam'])
+        wstep = get_parameter(arl_config, 'wstep', advice['w_sampling_primary_beam'])
 
     
     :param vis:

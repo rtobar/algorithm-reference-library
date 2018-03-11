@@ -41,7 +41,7 @@ def git_hash():
 
 def trial_case(results, seed=180555, context='wstack',
                order='frequency', nfreqwin=7, ntimes=3, rmax=750.0,
-               facets=1, wprojection_planes=1, **kwargs):
+               facets=1, wprojection_planes=1, arl_config='arl_config.ini'):
     """ Single trial for performance-timings
     
     Simulates visibilities from GLEAM including phase errors
@@ -90,7 +90,7 @@ def trial_case(results, seed=180555, context='wstack',
     :param rmax: See create_simulate_vis_graph
     :param facets: Number of facets to use
     :param wprojection_planes: Number of wprojection planes to use
-    :param kwargs:
+    :param arl_config:
     :return: results dictionary
     """
     
@@ -203,7 +203,7 @@ def trial_case(results, seed=180555, context='wstack',
     print("****** Starting dirty image calculation ******")
     start = time.time()
     dirty, sumwt = invert_function(vis, empty_model, vis_slices=vis_slices, facets=facets,
-                                   dopsf=False, context=context, **kwargs)
+                                   dopsf=False, context=context, arl_config='arl_config.ini')
     end = time.time()
     results['time invert'] = end - start
     print("Dirty image invert took %.2f seconds" % (end - start))

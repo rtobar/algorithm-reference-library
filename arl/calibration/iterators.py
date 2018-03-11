@@ -16,21 +16,20 @@ from typing import Union
 import numpy
 
 from arl.data.data_models import GainTable
-from arl.data.parameters import get_parameter
 
 log = logging.getLogger(__name__)
 
-def gaintable_null_iter(gt: GainTable, **kwargs) -> numpy.ndarray:
+def gaintable_null_iter(gt: GainTable, arl_config='arl_config.ini') -> numpy.ndarray:
     """One time iterator returning true for all rows
     
     :param gt:
-    :param kwargs:
+    :param arl_config:
     :return:
     """
     yield numpy.ones_like(gt.time, dtype=bool)
 
 
-def gaintable_timeslice_iter(gt: GainTable, **kwargs) -> numpy.ndarray:
+def gaintable_timeslice_iter(gt: GainTable, timeslice='auto', gt_slices=None) -> numpy.ndarray:
     """ W slice iterator
 
     :param wstack: wstack (wavelengths)
@@ -41,7 +40,6 @@ def gaintable_timeslice_iter(gt: GainTable, **kwargs) -> numpy.ndarray:
     timemin = numpy.min(gt.time)
     timemax = numpy.max(gt.time)
     
-    timeslice = get_parameter(kwargs, "timeslice", 'auto')
     if timeslice == 'auto':
         boxes = numpy.unique(gt.time)
         timeslice = 0.1
@@ -51,7 +49,6 @@ def gaintable_timeslice_iter(gt: GainTable, **kwargs) -> numpy.ndarray:
     elif isinstance(timeslice, float) or isinstance(timeslice, int):
         boxes = numpy.arange(timemin, timemax, timeslice)
     else:
-        gt_slices = get_parameter(kwargs, "gaintable_slices", None)
         assert gt_slices is not None, "Time slicing not specified: set either timeslice or gt_slices"
         boxes = numpy.linspace(timemin, timemax, gt_slices)
         if gt_slices > 1:

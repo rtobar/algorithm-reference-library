@@ -7,7 +7,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def import_pipeline_parameters(**kwargs):
+def import_pipeline_parameters():
     """ Import parameters to pipelines
     
     Placeholder
@@ -19,7 +19,7 @@ def import_pipeline_parameters(**kwargs):
     pass
 
 
-def export_pipeline_log(**kwargs):
+def export_pipeline_log():
     """ Export pipeline log
     
     Place-holder

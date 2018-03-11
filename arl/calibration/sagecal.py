@@ -58,7 +58,7 @@ from arl.visibility.visibility_fitting import fit_visibility
 log = logging.getLogger(__name__)
 
 
-def initialise_sagecal_thetas(vis: BlockVisibility, comps, **kwargs):
+def initialise_sagecal_thetas(vis: BlockVisibility, comps, arl_config='arl_config.ini'):
     """Create the thetas
 
     Create the data model for each window, from the visibility and the existing components
@@ -67,11 +67,11 @@ def initialise_sagecal_thetas(vis: BlockVisibility, comps, **kwargs):
     :param gt:
     :return:
     """
-    gt = create_gaintable_from_blockvisibility(vis, **kwargs)
+    gt = create_gaintable_from_blockvisibility(vis, arl_config='arl_config.ini')
     return [(copy_skycomponent(sc), copy_gaintable(gt)) for sc in comps]
 
 
-def sagecal_fit_component(vis, theta, gain=0.1, method='fit', **kwargs):
+def sagecal_fit_component(vis, theta, gain=0.1, method='fit', arl_config='arl_config.ini'):
     """Fit a single component to a visibility i.e. A13
 
     This is the update to the component part of the window.
@@ -80,7 +80,7 @@ def sagecal_fit_component(vis, theta, gain=0.1, method='fit', **kwargs):
     :param theta: Theta element being fit
     :param gain: Gain in step
     :param method: 'fit' or 'sum'
-    :param kwargs:
+    :param arl_config:
     :return: skycomponent
     """
     cvis = convert_blockvisibility_to_visibility(vis)
@@ -94,7 +94,7 @@ def sagecal_fit_component(vis, theta, gain=0.1, method='fit', **kwargs):
 
     return new_comp
 
-def sagecal_fit_gaintable(evis, theta, gain=0.1, niter=3, tol=1e-3, **kwargs):
+def sagecal_fit_gaintable(evis, theta, gain=0.1, niter=3, tol=1e-3, arl_config='arl_config.ini'):
     """Fit a gaintable to a visibility i.e. A13
     
     This is the update to the gain part of the window
@@ -103,27 +103,27 @@ def sagecal_fit_gaintable(evis, theta, gain=0.1, niter=3, tol=1e-3, **kwargs):
     :param theta: Theta element being fit
     :param gain: Gain in step
     :param niter: Number of iterations
-    :param kwargs: Gaintable
+    :param arl_config: Gaintable
     """
     previous_gt = copy_gaintable(theta[1])
     gt = copy_gaintable(theta[1])
     model_vis = copy_visibility(evis, zero=True)
     model_vis = predict_skycomponent_visibility(model_vis, theta[0])
-    gt = solve_gaintable(evis, model_vis, gt=gt, niter=niter, phase_only=True, gain=0.5, tol=1e-4, **kwargs)
+    gt = solve_gaintable(evis, model_vis, gt=gt, niter=niter, phase_only=True, gain=0.5, tol=1e-4, arl_config=arl_config)
     gt.data['gain'][...] = gain * gt.data['gain'][...] + \
                            (1 - gain) * previous_gt.data['gain'][...]
     gt.data['gain'][...] /= numpy.abs(previous_gt.data['gain'][...])
     return gt
 
 
-def sagecal_e_step(vis: BlockVisibility, evis_all: BlockVisibility, theta, **kwargs):
+def sagecal_e_step(vis: BlockVisibility, evis_all: BlockVisibility, theta):
     """Calculates E step in equation A12
 
     This is the data model for this window plus the difference between observed data and summed data models
 
     :param evis_all: Sum data models
     :param theta: Theta element being fit
-    :param kwargs:
+    :param arl_config:
     :return: Data model (i.e. visibility) for this theta
     """
     evis = copy_visibility(evis_all)
@@ -141,7 +141,7 @@ def sagecal_e_all(vis: BlockVisibility, thetas):
 
     :param vis: Visibility
     :param thetas: list of the thetas
-    :param kwargs:
+    :param arl_config:
     :return: Sum of data models (i.e. a visibility)
     """
     evis = copy_visibility(vis, zero=True)
@@ -154,21 +154,21 @@ def sagecal_e_all(vis: BlockVisibility, thetas):
     return evis
 
 
-def sagecal_m_step(evis: BlockVisibility, theta, **kwargs):
+def sagecal_m_step(evis: BlockVisibility, theta, arl_config='arl_config.ini'):
     """Calculates M step in equation A13
 
     This maximises the likelihood of the theta parameters given the existing data model. Note that these are done
     separately rather than jointly.
 
     :param theta:
-    :param kwargs:
+    :param arl_config:
     :return:
     """
-    return (sagecal_fit_component(evis, theta, **kwargs),
-            sagecal_fit_gaintable(evis, theta, **kwargs))
+    return (sagecal_fit_component(evis, theta, arl_config=arl_config),
+            sagecal_fit_gaintable(evis, theta, arl_config=arl_config))
 
 
-def sagecal_solve(vis, components, niter=10, tol=1e-8, gain=0.25, callback=None, **kwargs):
+def sagecal_solve(vis, components, niter=10, tol=1e-8, gain=0.25, callback=None, arl_config='arl_config.ini'):
     """ Solve
     
     Solve by iterating, performing E step and M step.
@@ -176,18 +176,18 @@ def sagecal_solve(vis, components, niter=10, tol=1e-8, gain=0.25, callback=None,
     :param vis: Initial visibility
     :param components: Initial components to be used
     :param gaintables: Initial gain tables to be used
-    :param kwargs:
+    :param arl_config:
     :return: The individual data models and the residual visibility
     """
-    thetas = initialise_sagecal_thetas(vis, components, **kwargs)
+    thetas = initialise_sagecal_thetas(vis, components, arl_config=arl_config)
     
     for iter in range(niter):
         new_thetas = list()
         evis_all = sagecal_e_all(vis, thetas)
         print("Iteration %d" % (iter))
         for window_index, theta in enumerate(thetas):
-            evis = sagecal_e_step(vis, evis_all, theta, gain=gain, **kwargs)
-            new_theta = sagecal_m_step(evis, theta, **kwargs)
+            evis = sagecal_e_step(vis, evis_all, theta, gain=gain, arl_config=arl_config)
+            new_theta = sagecal_m_step(evis, theta, arl_config=arl_config)
             new_thetas.append(new_theta)
             
             if callback is not None:

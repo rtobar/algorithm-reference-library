@@ -11,6 +11,7 @@ from arl.util.testing_support import create_named_configuration
 from arl.calibration.iterators import gaintable_timeslice_iter, gaintable_null_iter
 from arl.calibration.operations import create_gaintable_from_blockvisibility
 from arl.visibility.base import create_blockvisibility, create_visibility_from_rows
+from arl.data.parameters import set_parameters
 
 import logging
 log = logging.getLogger(__name__)
@@ -34,7 +35,8 @@ class TestGainTableIterators(unittest.TestCase):
         self.vis = create_blockvisibility(self.lowcore, self.times, self.frequency,
                                      channel_bandwidth=self.channel_bandwidth, phasecentre=self.phasecentre,
                                      weight=1.0)
-        self.gaintable = create_gaintable_from_blockvisibility(self.vis, time_slice='auto')
+        set_parameters('arl_config.ini', {'time_slice':'auto'})
+        self.gaintable = create_gaintable_from_blockvisibility(self.vis, arl_config='arl_config.ini')
 
     def test_gt_null_iterator(self):
         self.actualSetUp()
@@ -43,11 +45,12 @@ class TestGainTableIterators(unittest.TestCase):
 
     def test_gt_timeslice_iterator(self):
         self.actualSetUp()
-        nchunks = len(list(gaintable_timeslice_iter(self.gaintable, timeslice='auto')))
+        set_parameters('arl_config.ini', {'time_slice':'auto'})
+        nchunks = len(list(gaintable_timeslice_iter(self.gaintable, arl_config='arl_config.ini')))
         log.debug('Found %d chunks' % (nchunks))
         assert nchunks > 1
         total_rows = 0
-        for chunk, rows in enumerate(gaintable_timeslice_iter(self.gaintable, timeslice='auto')):
+        for chunk, rows in enumerate(gaintable_timeslice_iter(self.gaintable, arl_config='arl_config.ini')):
             total_rows += numpy.sum(rows)
             assert len(rows)
             assert numpy.sum(rows) < self.gaintable.gain.shape[0]

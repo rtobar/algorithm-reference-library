@@ -9,22 +9,21 @@ import numpy
 import logging
 from arl.data.data_models import Image
 from arl.image.operations import create_image_from_array
-from arl.data.parameters import get_parameter
 
 log = logging.getLogger(__name__)
 
 
-def image_null_iter(im: Image, **kwargs) -> numpy.ndarray:
+def image_null_iter(im: Image, arl_config='arl_config.ini') -> numpy.ndarray:
     """One time iterator
 
     :param im:
-    :param kwargs:
+    :param arl_config:
     :return:
     """
     yield im
 
 
-def image_raster_iter(im: Image, **kwargs) -> Image:
+def image_raster_iter(im: Image, facets=1) -> Image:
     """Create an image_raster_iter generator, returning images
 
     The WCS is adjusted appropriately for each raster element. Hence this is a coordinate-aware
@@ -38,10 +37,9 @@ def image_raster_iter(im: Image, **kwargs) -> Image:
 
     :param im: Image
     :param facets: Number of image partitions on each axis (2)
-    :param kwargs: throw away unwanted parameters
+    :param arl_config: throw away unwanted parameters
     """
 
-    facets = get_parameter(kwargs, "facets", 1)
     log.debug("raster: predicting using %d x %d image partitions" % (facets, facets))
     assert facets <= im.nheight, "Cannot have more raster elements than pixels"
     assert facets <= im.nwidth, "Cannot have more raster elements than pixels"

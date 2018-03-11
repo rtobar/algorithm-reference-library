@@ -13,14 +13,14 @@ The graph for one vis_graph is executed as follows::
 
     solution_graph[0].compute()
     
-or if a Dask.dsitributed client is available:
+or if a Dask.distributed client is available:
 
     client.compute(solution_graph)
 
 As well as the specific graphs constructed by functions in this module, there are generic versions in the module
 :mod:`arl.pipelines.generic_dask_graphs`.
 
-Note that all parameters here should be passed using the kwargs mechanism. The exceptions
+Note that all parameters here should be passed using the arl_config mechanism. The exceptions
 are those needed to define the size of a graph. Since delayed graphs are not Iterable
 by default, it is necessary to use the nout= parameter to delayed to specify the
 graph size.
@@ -56,7 +56,7 @@ from arl.visibility.gather_scatter import visibility_gather_channel
 from arl.visibility.operations import divide_visibility, integrate_visibility_by_channel
 
 
-def compute_list(client, graph_list, **kwargs):
+def compute_list(client, graph_list, arl_config='arl_config.ini'):
     """ Compute all elements in list
 
     :param client: Client from dask.distributed
@@ -64,7 +64,7 @@ def compute_list(client, graph_list, **kwargs):
     :return: list
     """
     nworkers_initial = len(client.scheduler_info()['workers'])
-    futures = client.compute(graph_list, **kwargs)
+    futures = client.compute(graph_list, arl_config=arl_config)
     wait(futures)
     nworkers_final = len(client.scheduler_info()['workers'])
     # Check that the number of workers has not decreased. On the first call, it seems that
@@ -163,20 +163,20 @@ def create_subtract_vis_graph_list(vis_graph_list, model_vis_graph_list):
             for i in range(len(vis_graph_list))]
 
 
-def create_weight_vis_graph_list(vis_graph_list, model_graph, weighting='uniform', **kwargs):
+def create_weight_vis_graph_list(vis_graph_list, model_graph, weighting='uniform', arl_config='arl_config.ini'):
     """ Weight the visibility data
 
     :param vis_graph_list:
     :param model_graph: Model required to determine weighting parameters
     :param weighting: Type of weighting
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return: List of vis_graphs
    """
     
     def weight_vis(vis, model):
         if vis is not None:
             if model is not None:
-                vis, _, _ = weight_visibility(vis, model, weighting=weighting, **kwargs)
+                vis, _, _ = weight_visibility(vis, model, weighting=weighting, arl_config=arl_config)
                 return vis
             else:
                 return None
@@ -188,7 +188,7 @@ def create_weight_vis_graph_list(vis_graph_list, model_graph, weighting='uniform
 
 
 def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=False, normalize=True,
-                        facets=1, vis_slices=None, context='2d', **kwargs) -> delayed:
+                        facets=1, vis_slices=None, context='2d', arl_config='arl_config.ini') -> delayed:
     """ Sum results from invert, iterating over the scattered image and vis_graph_list
 
     :param vis_graph_list:
@@ -198,7 +198,7 @@ def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=Fal
     :param normalize: Normalize by sumwt
     :param vis_slices: Number of slices
     :param context: Imaging context
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return: delayed for invert
    """
     c = imaging_context(context)
@@ -209,21 +209,21 @@ def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=Fal
     
     def scatter_vis(vis):
         if isinstance(vis, BlockVisibility):
-            avis = coalesce_visibility(vis, **kwargs)
+            avis = coalesce_visibility(vis, arl_config=arl_config)
         else:
             avis = vis
-        result = [create_visibility_from_rows(avis, rows) for rows in vis_iter(avis, vis_slices=vis_slices, **kwargs)]
+        result = [create_visibility_from_rows(avis, rows) for rows in vis_iter(avis, vis_slices=vis_slices, arl_config=arl_config)]
         assert len(result) == vis_slices, "result %s, vis_slices %d" % (str(result), vis_slices)
         return result
     
     def scatter_image_iteration(im):
-        return [subim for subim in image_iter(im, facets=facets, **kwargs)]
+        return [subim for subim in image_iter(im, facets=facets, arl_config=arl_config)]
     
     def gather_image_iteration_results(results, template_model):
         result = create_empty_image_like(template_model)
         i = 0
         sumwt = numpy.zeros([template_model.nchan, template_model.npol])
-        for dpatch in image_iter(result, facets=facets, **kwargs):
+        for dpatch in image_iter(result, facets=facets, arl_config=arl_config):
             assert i < len(results), "Too few results in gather_image_iteration_results"
             if results[i] is not None:
                 assert len(results[i]) == 2, results[i]
@@ -234,7 +234,7 @@ def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=Fal
     
     def invert_ignore_none(vis, model):
         if vis is not None:
-            return invert(vis, model, context=context, dopsf=dopsf, normalize=normalize, **kwargs)
+            return invert(vis, model, context=context, dopsf=dopsf, normalize=normalize, arl_config=arl_config)
         else:
             return create_empty_image_like(model), 0.0
     
@@ -269,7 +269,7 @@ def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=Fal
     return results_vis_graph_list
 
 
-def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, facets=1, context='2d', **kwargs):
+def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, facets=1, context='2d', arl_config='arl_config.ini'):
     """Predict, iterating over both the scattered vis_graph_list and image
 
     :param facets: 
@@ -277,7 +277,7 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
     :param vis_graph_list:
     :param model_graph: Model used to determine image parameters
     :param vis_slices: Number of vis slices (w stack or timeslice)
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return: List of vis_graphs
    """
     c = imaging_context(context)
@@ -289,7 +289,7 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
     def predict_ignore_none(vis, model):
         if vis is not None:
             predicted = copy_visibility(vis)
-            predicted = predict(predicted, model, context=context, **kwargs)
+            predicted = predict(predicted, model, context=context, arl_config=arl_config)
             return predicted
         else:
             return None
@@ -298,31 +298,31 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
         # Gather across the visibility iteration axis
         assert vis is not None
         if isinstance(vis, BlockVisibility):
-            avis = coalesce_visibility(vis, **kwargs)
+            avis = coalesce_visibility(vis, arl_config=arl_config)
         else:
             avis = vis
-        for i, rows in enumerate(vis_iter(avis, vis_slices=vis_slices, **kwargs)):
+        for i, rows in enumerate(vis_iter(avis, vis_slices=vis_slices, arl_config=arl_config)):
             assert i < len(results), "Insufficient results for the gather"
             if rows is not None and results[i] is not None:
                 avis.data['vis'][rows] = results[i].data['vis']
         
         if isinstance(vis, BlockVisibility):
-            return decoalesce_visibility(avis, **kwargs)
+            return decoalesce_visibility(avis, arl_config=arl_config)
         else:
             return avis
     
     def scatter_vis(vis):
         # Scatter along the visibility iteration axis
         if isinstance(vis, BlockVisibility):
-            avis = coalesce_visibility(vis, **kwargs)
+            avis = coalesce_visibility(vis, arl_config=arl_config)
         else:
             avis = vis
-        result = [create_visibility_from_rows(avis, rows) for rows in vis_iter(avis, vis_slices=vis_slices, **kwargs)]
+        result = [create_visibility_from_rows(avis, rows) for rows in vis_iter(avis, vis_slices=vis_slices, arl_config=arl_config)]
         return result
     
     def scatter_image(im):
         # Scatter across image iteration
-        return [subim for subim in image_iter(im, facets=facets, **kwargs)]
+        return [subim for subim in image_iter(im, facets=facets, arl_config=arl_config)]
     
     results_vis_graph_list = list()
     for freqwin, vis_graph in enumerate(vis_graph_list):
@@ -341,7 +341,7 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
     return results_vis_graph_list
 
 
-def create_residual_graph(vis, model_graph: delayed, context='2d', **kwargs) -> delayed:
+def create_residual_graph(vis, model_graph: delayed, context='2d', arl_config='arl_config.ini') -> delayed:
     """ Create a graph to calculate residual image using w stacking and faceting
 
     :param context: 
@@ -349,41 +349,41 @@ def create_residual_graph(vis, model_graph: delayed, context='2d', **kwargs) -> 
     :param model_graph: Model used to determine image parameters
     :param vis:
     :param model_graph: Model used to determine image parameters
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return:
     """
     model_vis = create_zero_vis_graph_list(vis)
-    model_vis = create_predict_graph(model_vis, model_graph, context=context, **kwargs)
+    model_vis = create_predict_graph(model_vis, model_graph, context=context, arl_config=arl_config)
     residual_vis = create_subtract_vis_graph_list(vis, model_vis)
     return create_invert_graph(residual_vis, model_graph, dopsf=False, normalize=True, context=context,
-                               **kwargs)
+                               arl_config=arl_config)
 
 
-def create_restore_graph(model_graph: delayed, psf_graph, residual_graph, **kwargs) -> delayed:
+def create_restore_graph(model_graph: delayed, psf_graph, residual_graph, arl_config='arl_config.ini') -> delayed:
     """ Create a graph to calculate the restored image
 
     :param model_graph: Model graph
     :param psf_graph: PSF graph
     :param residual_graph: Residual graph
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return:
     """
-    return [delayed(restore_cube)(model_graph[i], psf_graph[i][0], residual_graph[i][0], **kwargs)
+    return [delayed(restore_cube)(model_graph[i], psf_graph[i][0], residual_graph[i][0], arl_config=arl_config)
             for i, _ in enumerate(model_graph)]
 
 
 def create_deconvolve_graph(dirty_graph: delayed, psf_graph: delayed, model_graph: delayed,
-                            **kwargs) -> delayed:
+                            arl_config) -> delayed:
     """Create a graph for deconvolution, adding to the model
 
     :param dirty_graph:
     :param psf_graph:
     :param model_graph:
     :param nchan: Number of channels
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return:
     """
-    nchan = get_parameter(kwargs, "nchan", 1)
+    nchan = get_parameter(arl_config, "nchan", 1)
 
     def remove_sumwt(dirty_list):
         return [d[0] for d in dirty_list]
@@ -392,17 +392,17 @@ def create_deconvolve_graph(dirty_graph: delayed, psf_graph: delayed, model_grap
         dirty_cube = image_gather_channels(remove_sumwt(dirty), subimages=nchan)
         psf_cube = image_gather_channels(remove_sumwt(psf), subimages=nchan)
         model_cube = image_gather_channels(model, subimages=nchan)
-        result = deconvolve_cube(dirty_cube, psf_cube, **kwargs)
+        result = deconvolve_cube(dirty_cube, psf_cube, arl_config=arl_config)
         result[0].data += model_cube.data
         return image_scatter_channels(result[0], nchan)
     
 
     def deconvolve(dirty, psf, model):
-        result = deconvolve_cube(dirty[0], psf[0], **kwargs)
+        result = deconvolve_cube(dirty[0], psf[0], arl_config=arl_config)
         result[0].data += model.data
         return result[0]
 
-    algorithm = get_parameter(kwargs, "algorithm", 'mmclean')
+    algorithm = get_parameter(arl_config, "algorithm", 'mmclean')
     if algorithm == "mmclean" and nchan > 1:
         return delayed(make_cube_and_deconvolve, nout=nchan)(dirty_graph, psf_graph, model_graph)
     else:
@@ -411,7 +411,7 @@ def create_deconvolve_graph(dirty_graph: delayed, psf_graph: delayed, model_grap
 
 
 def create_deconvolve_facet_graph(dirty_graph: delayed, psf_graph: delayed, model_graph: delayed,
-                                  facets=1, **kwargs) -> delayed:
+                                  facets=1, arl_config='arl_config.ini') -> delayed:
     """Create a graph for deconvolution by subimages, adding to the model
     
     Does deconvolution subimage by subimage. Currently does nothing very sensible about the
@@ -421,7 +421,7 @@ def create_deconvolve_facet_graph(dirty_graph: delayed, psf_graph: delayed, mode
     :param dirty_graph:
     :param psf_graph:
     :param model_graph: Current model
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return:
     """
     
@@ -429,7 +429,7 @@ def create_deconvolve_facet_graph(dirty_graph: delayed, psf_graph: delayed, mode
         assert isinstance(dirty, Image)
         assert isinstance(psf, Image)
         assert isinstance(model, Image)
-        comp = deconvolve_cube(dirty, psf, **kwargs)
+        comp = deconvolve_cube(dirty, psf, arl_config=arl_config)
         comp[0].data += model.data
         return comp[0]
     
@@ -441,7 +441,7 @@ def create_deconvolve_facet_graph(dirty_graph: delayed, psf_graph: delayed, mode
 
 
 def create_deconvolve_channel_graph(dirty_graph: delayed, psf_graph: delayed, model_graph: delayed, subimages,
-                                    **kwargs) -> delayed:
+                                    arl_config) -> delayed:
     """Create a graph for deconvolution by channels, adding to the model
 
     Does deconvolution channel by channel.
@@ -449,14 +449,14 @@ def create_deconvolve_channel_graph(dirty_graph: delayed, psf_graph: delayed, mo
     :param dirty_graph:
     :param psf_graph: Must be the size of a facet
     :param model_graph: Current model
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return:
     """
     
     def deconvolve_subimage(dirty, psf):
         assert isinstance(dirty, Image)
         assert isinstance(psf, Image)
-        comp = deconvolve_cube(dirty, psf, **kwargs)
+        comp = deconvolve_cube(dirty, psf, arl_config=arl_config)
         return comp[0]
     
     def add_model(sum_model, model):
@@ -474,7 +474,7 @@ def create_deconvolve_channel_graph(dirty_graph: delayed, psf_graph: delayed, mo
 
 
 def create_selfcal_graph_list(vis_graph_list, model_graph: delayed, c_predict_graph,
-                              vis_slices, **kwargs):
+                              vis_slices, arl_config='arl_config.ini'):
     """ Create a set of graphs for (optionally global) selfcalibration of a list of visibilities
 
     If global solution is true then visibilities are gathered to a single visibility data set which is then
@@ -485,16 +485,16 @@ def create_selfcal_graph_list(vis_graph_list, model_graph: delayed, c_predict_gr
     :param model_graph:
     :param c_predict_graph: Function to create prediction graphs
     :param vis_slices:
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return:
     """
     
     model_vis_graph_list = create_zero_vis_graph_list(vis_graph_list)
-    model_vis_graph_list = c_predict_graph(model_vis_graph_list, model_graph, vis_slices=vis_slices, **kwargs)
-    return create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, **kwargs)
+    model_vis_graph_list = c_predict_graph(model_vis_graph_list, model_graph, vis_slices=vis_slices, arl_config=arl_config)
+    return create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, arl_config=arl_config)
 
 
-def create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, global_solution=True, **kwargs):
+def create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, global_solution=True, arl_config='arl_config.ini'):
     """ Create a set of graphs for (optionally global) calibration of a list of visibilities
 
     If global solution is true then visibilities are gathered to a single visibility data set which is then
@@ -504,12 +504,12 @@ def create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, global_sol
     :param vis_graph_list:
     :param model_vis_graph_list:
     :param global_solution: Solve for global gains
-    :param kwargs: Parameters for functions in graphs
+    :param arl_config: Parameters for functions in graphs
     :return:
     """
 
     def solve_and_apply(vis, modelvis=None):
-        return calibrate_function(vis, modelvis, **kwargs)[0]
+        return calibrate_function(vis, modelvis, arl_config=arl_config)[0]
 
     if global_solution:
         point_vis_graph_list = [delayed(divide_visibility, nout=len(vis_graph_list))(vis_graph_list[i],
@@ -518,7 +518,7 @@ def create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, global_sol
         global_point_vis_graph = delayed(visibility_gather_channel, nout=1)(point_vis_graph_list)
         global_point_vis_graph = delayed(integrate_visibility_by_channel, nout=1)(global_point_vis_graph)
         # This is a global solution so we only get one gain table
-        _, gt_graph = delayed(solve_and_apply, pure=True, nout=2)(global_point_vis_graph, **kwargs)
+        _, gt_graph = delayed(solve_and_apply, pure=True, nout=2)(global_point_vis_graph, arl_config=arl_config)
         return [delayed(apply_gaintable, nout=len(vis_graph_list))(v, gt_graph, inverse=True)
                 for v in vis_graph_list]
     else:

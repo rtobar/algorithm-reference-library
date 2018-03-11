@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 
 def solve_gaintable(vis: BlockVisibility, modelvis: BlockVisibility = None, gt=None, phase_only=True, niter=30,
                     tol=1e-8,
-                    crosspol=False, **kwargs) -> GainTable:
+                    crosspol=False, arl_config='arl_config.ini') -> GainTable:
     """Solve a gain table by fitting an observed visibility to a model visibility
     
     If modelvis is None, a point source model is assumed.
@@ -52,7 +52,7 @@ def solve_gaintable(vis: BlockVisibility, modelvis: BlockVisibility = None, gt=N
     
     if gt is None:
         log.debug("solve_gaintable: creating new gaintable")
-        gt = create_gaintable_from_blockvisibility(vis, **kwargs)
+        gt = create_gaintable_from_blockvisibility(vis, arl_config=arl_config)
     else:
         log.debug("solve_gaintable: starting from existing gaintable")
 

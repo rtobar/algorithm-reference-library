@@ -44,7 +44,7 @@ def create_simulate_vis_graph(config='LOWBD2-CORE',
     :param polarisation_frame: def PolarisationFrame("stokesI")
     :param order: 'time' or 'frequency' or 'both' or None: def 'frequency'
     :param format: 'blockvis' or 'vis': def 'blockvis'
-    :param kwargs:
+    :param arl_config:
     :return: vis_graph_list with different frequencies in different elements
     """
     if format == 'vis':
@@ -101,7 +101,7 @@ def create_simulate_vis_graph(config='LOWBD2-CORE',
 
 
 def create_predict_gleam_model_graph(vis_graph_list, frequency, channel_bandwidth,
-                                     npixel=512, cellsize=0.001, **kwargs):
+                                     npixel=512, cellsize=0.001, arl_config='arl_config.ini'):
     """ Create a graph to fill in a model with the gleam sources and predict into a vis_graph_list
 
     :param vis_graph_list:
@@ -109,7 +109,7 @@ def create_predict_gleam_model_graph(vis_graph_list, frequency, channel_bandwidt
     :param channel_bandwidth:
     :param npixel: 512
     :param cellsize: 0.001
-    :param kwargs:
+    :param arl_config:
     :return: vis_graph_list
     """
     
@@ -118,28 +118,28 @@ def create_predict_gleam_model_graph(vis_graph_list, frequency, channel_bandwidt
     predicted_vis_graph_list = list()
     for i, vis_graph in enumerate(vis_graph_list):
         facets = {}
-        if get_parameter(kwargs, "facets", False):
-            facets = {'facets': get_parameter(kwargs, "facets", False)}
+        if get_parameter(arl_config, "facets", False):
+            facets = {'facets': get_parameter(arl_config, "facets", False)}
         model_graph = delayed(create_low_test_image_from_gleam)(vis_graph, frequency,
                                                                 channel_bandwidth, npixel=npixel,
                                                                 cellsize=cellsize, **facets)
-        predicted_vis_graph_list.append(create_predict_graph([vis_graph], model_graph, **kwargs)[0])
+        predicted_vis_graph_list.append(create_predict_graph([vis_graph], model_graph, arl_config='arl_config.ini')[0])
     return predicted_vis_graph_list
 
 
-def create_corrupt_vis_graph(vis_graph_list, gt_graph=None, **kwargs):
+def create_corrupt_vis_graph(vis_graph_list, gt_graph=None, arl_config='arl_config.ini'):
     """ Create a graph to apply gain errors to a vis_graph_list
 
     :param vis_graph_list:
     :param gt_graph: Optional gain table graph
-    :param kwargs:
+    :param arl_config:
     :return:
     """
     
-    def corrupt_vis(vis, gt, **kwargs):
+    def corrupt_vis(vis, gt, arl_config='arl_config.ini'):
         if gt is None:
-            gt = create_gaintable_from_blockvisibility(vis, **kwargs)
-            gt = simulate_gaintable(gt, **kwargs)
+            gt = create_gaintable_from_blockvisibility(vis, arl_config='arl_config.ini')
+            gt = simulate_gaintable(gt, arl_config='arl_config.ini')
         return apply_gaintable(vis, gt)
     
-    return [delayed(corrupt_vis, nout=1)(vis_graph, gt_graph, **kwargs) for vis_graph in vis_graph_list]
+    return [delayed(corrupt_vis, nout=1)(vis_graph, gt_graph, arl_config='arl_config.ini') for vis_graph in vis_graph_list]

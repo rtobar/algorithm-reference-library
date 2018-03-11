@@ -60,10 +60,9 @@ class TestCalibrationSagecal(unittest.TestCase):
                                            polarisation_frame=PolarisationFrame("stokesI"))
         
         block_vis.data['uvw'][..., 2] = 0.0
-        self.beam = create_image_from_visibility(block_vis, npixel=npixel, frequency=[numpy.average(frequency)],
-                                                 nchan=nfreqwin,
-                                                 channel_bandwidth=[numpy.sum(channel_bandwidth)], cellsize=cellsize,
-                                                 phasecentre=phasecentre)
+        self.beam = create_image_from_visibility(block_vis, npixel=npixel, cellsize=cellsize, phasecentre=phasecentre,
+                                                 frequency=[numpy.average(frequency)],
+                                                 channel_bandwidth=[numpy.sum(channel_bandwidth)], nchan=nfreqwin)
         
         self.components = create_low_test_skycomponents_from_gleam(flux_limit=flux_limit, phasecentre=phasecentre,
                                                                    frequency=frequency,

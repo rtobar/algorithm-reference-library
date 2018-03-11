@@ -11,7 +11,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def run_unittests(logLevel=logging.DEBUG, *args, **kwargs):
+def run_unittests(logLevel=logging.DEBUG, *args, arl_config='arl_config.ini'):
     """Runs the unit tests in all loaded modules.
 
     :param logLevel: The amount of logging to generate. By default, we
@@ -24,4 +24,4 @@ def run_unittests(logLevel=logging.DEBUG, *args, **kwargs):
     rootLog.addHandler(logging.StreamHandler(sys.stderr))
 
     # Call unittest main
-    unittest.main(*args, **kwargs)
+    unittest.main(*args, arl_config='arl_config.ini')
