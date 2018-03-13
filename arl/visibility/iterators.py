@@ -45,8 +45,8 @@ def vis_timeslice_iter(vis: Visibility, timeslice='auto', vis_slices=None) -> nu
     elif timeslice is None:
         timeslice = timemax - timemin
         boxes = [0.5*(timemax+timemin)]
-    elif isinstance(timeslice, float) or isinstance(timeslice, int):
-        boxes = numpy.arange(timemin, timemax, timeslice)
+    elif timeslice is not None:
+        boxes = numpy.arange(timemin, timemax, int(timeslice))
     else:
         assert vis_slices is not None, "Time slicing not specified: set either timeslice or vis_slices"
         boxes = numpy.linspace(timemin, timemax, vis_slices)
@@ -72,6 +72,7 @@ def vis_wstack_iter(vis: Visibility, wstack=None, vis_slices=None) -> numpy.ndar
     
     if wstack is None:
         assert vis_slices is not None, "w slicing not specified: set either wstack or vis_slices"
+        vis_slices = int(vis_slices)
         boxes = numpy.linspace(-wmaxabs, wmaxabs, vis_slices)
         if vis_slices > 1:
             wstack = boxes[1] - boxes[0]
@@ -100,11 +101,9 @@ def vis_slice_iter(vis: Union[Visibility, BlockVisibility], step=None, vis_slice
     """
     assert isinstance(vis, Visibility) or isinstance(vis, BlockVisibility), vis
     
-    vis_slices=int(vis_slices)
-    
     if step is None:
         assert vis_slices is not None, "vis slicing not specified: set either step or vis_slices"
-        step = vis.nvis // vis_slices
+        step = vis.nvis // int(vis_slices)
         
     assert step > 0
     for row in range(0, vis.nvis, step):

@@ -42,7 +42,7 @@ class TestImagingDelayed(unittest.TestCase):
                        'padding': 2,
                        'oversampling': 2,
                        'kernel': '2d',
-                       'wstep': 4.0,
+                       'wstep': 0.0,
                        'vis_slices': 1,
                        'wstack': None,
                        'timeslice': 'auto'}
@@ -236,12 +236,12 @@ class TestImagingDelayed(unittest.TestCase):
         self._invert_base(context='timeslice', extra='_wprojection', flux_max=116.9, flux_min=-3.0, flux_tolerance=3.0)
     
     def test_invert_wprojection(self):
-        self.params['kernel'] = 'wprojection'
+        self.params['wstep'] = 4.0
         self.actualSetUp()
         self._invert_base(context='2d', extra='_wprojection', flux_max=116.9, flux_min=-3.0, flux_tolerance=3.0)
     
     def test_invert_wprojection_wstack(self):
-        self.params['kernel'] = 'wprojection'
+        self.params['wstep'] = 4.0
         self.params['vis_slices'] = 7
         self.actualSetUp()
         self._invert_base(context='wstack', extra='_wprojection', flux_max=116.9, flux_min=-3.0, flux_tolerance=3.0)

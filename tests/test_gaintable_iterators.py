@@ -35,7 +35,7 @@ class TestGainTableIterators(unittest.TestCase):
         self.vis = create_blockvisibility(self.lowcore, self.times, self.frequency,
                                      channel_bandwidth=self.channel_bandwidth, phasecentre=self.phasecentre,
                                      weight=1.0)
-        set_parameters('arl_config.ini', {'time_slice':'auto'})
+        set_parameters('arl_config.ini', {'time_slice':'auto'}, 'calibration')
         self.gaintable = create_gaintable_from_blockvisibility(self.vis, arl_config='arl_config.ini')
 
     def test_gt_null_iterator(self):
@@ -45,7 +45,7 @@ class TestGainTableIterators(unittest.TestCase):
 
     def test_gt_timeslice_iterator(self):
         self.actualSetUp()
-        set_parameters('arl_config.ini', {'time_slice':'auto'})
+        set_parameters('arl_config.ini', {'time_slice':'auto'}, 'calibration')
         nchunks = len(list(gaintable_timeslice_iter(self.gaintable, arl_config='arl_config.ini')))
         log.debug('Found %d chunks' % (nchunks))
         assert nchunks > 1

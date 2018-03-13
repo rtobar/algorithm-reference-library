@@ -38,9 +38,8 @@ import numpy
 from dask import delayed
 from dask.distributed import wait
 
-from arl.calibration.operations import apply_gaintable
-from arl.calibration.solvers import solve_gaintable
 from arl.calibration.calibration_control import calibrate_function
+from arl.calibration.operations import apply_gaintable
 from arl.data.data_models import Image, BlockVisibility
 from arl.data.parameters import get_parameter
 from arl.image.deconvolution import deconvolve_cube, restore_cube
@@ -48,7 +47,7 @@ from arl.image.gather_scatter import image_scatter_facets, image_gather_facets, 
     image_gather_channels
 from arl.image.operations import copy_image, create_empty_image_like
 from arl.imaging import normalize_sumwt
-from arl.imaging.imaging_context import imaging_context
+from arl.imaging.imaging_context import imaging_context, make_vis_iter, make_image_iter
 from arl.imaging.weighting import weight_visibility
 from arl.visibility.base import copy_visibility, create_visibility_from_rows
 from arl.visibility.coalesce import coalesce_visibility, decoalesce_visibility
@@ -163,7 +162,7 @@ def create_subtract_vis_graph_list(vis_graph_list, model_vis_graph_list):
             for i in range(len(vis_graph_list))]
 
 
-def create_weight_vis_graph_list(vis_graph_list, model_graph, weighting='uniform', arl_config='arl_config.ini'):
+def create_weight_vis_graph_list(vis_graph_list, model_graph, weighting='uniform'):
     """ Weight the visibility data
 
     :param vis_graph_list:
@@ -176,7 +175,7 @@ def create_weight_vis_graph_list(vis_graph_list, model_graph, weighting='uniform
     def weight_vis(vis, model):
         if vis is not None:
             if model is not None:
-                vis, _, _ = weight_visibility(vis, model, weighting=weighting, arl_config=arl_config)
+                vis, _, _ = weight_visibility(vis, model, weighting=weighting)
                 return vis
             else:
                 return None
@@ -202,28 +201,27 @@ def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=Fal
     :return: delayed for invert
    """
     c = imaging_context(context)
-    image_iter = c['image_iterator']
-    vis_iter = c['vis_iterator']
     invert = c['invert']
     inner = c['inner']
     
     def scatter_vis(vis):
         if isinstance(vis, BlockVisibility):
-            avis = coalesce_visibility(vis, arl_config=arl_config)
+            avis = coalesce_visibility(vis)
         else:
             avis = vis
-        result = [create_visibility_from_rows(avis, rows) for rows in vis_iter(avis, vis_slices=vis_slices, arl_config=arl_config)]
+        result = [create_visibility_from_rows(avis, rows) for rows in
+                  make_vis_iter(avis, context, arl_config=arl_config)]
         assert len(result) == vis_slices, "result %s, vis_slices %d" % (str(result), vis_slices)
         return result
     
     def scatter_image_iteration(im):
-        return [subim for subim in image_iter(im, facets=facets, arl_config=arl_config)]
+        return [subim for subim in make_image_iter(im, context, arl_config=arl_config)]
     
     def gather_image_iteration_results(results, template_model):
         result = create_empty_image_like(template_model)
         i = 0
         sumwt = numpy.zeros([template_model.nchan, template_model.npol])
-        for dpatch in image_iter(result, facets=facets, arl_config=arl_config):
+        for dpatch in make_image_iter(result, context, arl_config=arl_config):
             assert i < len(results), "Too few results in gather_image_iteration_results"
             if results[i] is not None:
                 assert len(results[i]) == 2, results[i]
@@ -269,7 +267,8 @@ def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=Fal
     return results_vis_graph_list
 
 
-def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, facets=1, context='2d', arl_config='arl_config.ini'):
+def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, facets=1, context='2d',
+                         arl_config='arl_config.ini'):
     """Predict, iterating over both the scattered vis_graph_list and image
 
     :param facets: 
@@ -281,8 +280,6 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
     :return: List of vis_graphs
    """
     c = imaging_context(context)
-    image_iter = c['image_iterator']
-    vis_iter = c['vis_iterator']
     predict = c['predict']
     inner = c['inner']
     
@@ -298,10 +295,10 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
         # Gather across the visibility iteration axis
         assert vis is not None
         if isinstance(vis, BlockVisibility):
-            avis = coalesce_visibility(vis, arl_config=arl_config)
+            avis = coalesce_visibility(vis)
         else:
             avis = vis
-        for i, rows in enumerate(vis_iter(avis, vis_slices=vis_slices, arl_config=arl_config)):
+        for i, rows in enumerate(make_vis_iter(avis, context, arl_config=arl_config)):
             assert i < len(results), "Insufficient results for the gather"
             if rows is not None and results[i] is not None:
                 avis.data['vis'][rows] = results[i].data['vis']
@@ -314,15 +311,16 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
     def scatter_vis(vis):
         # Scatter along the visibility iteration axis
         if isinstance(vis, BlockVisibility):
-            avis = coalesce_visibility(vis, arl_config=arl_config)
+            avis = coalesce_visibility(vis)
         else:
             avis = vis
-        result = [create_visibility_from_rows(avis, rows) for rows in vis_iter(avis, vis_slices=vis_slices, arl_config=arl_config)]
+        result = [create_visibility_from_rows(avis, rows) for rows in
+                  make_vis_iter(avis, context, arl_config=arl_config)]
         return result
     
     def scatter_image(im):
         # Scatter across image iteration
-        return [subim for subim in image_iter(im, facets=facets, arl_config=arl_config)]
+        return [subim for subim in make_image_iter(im, context, arl_config=arl_config)]
     
     results_vis_graph_list = list()
     for freqwin, vis_graph in enumerate(vis_graph_list):
@@ -383,8 +381,8 @@ def create_deconvolve_graph(dirty_graph: delayed, psf_graph: delayed, model_grap
     :param arl_config: Parameters for functions in graphs
     :return:
     """
-    nchan = get_parameter(arl_config, "nchan", 1)
-
+    nchan = int(get_parameter(arl_config, "nchan", 1))
+    
     def remove_sumwt(dirty_list):
         return [d[0] for d in dirty_list]
     
@@ -396,12 +394,11 @@ def create_deconvolve_graph(dirty_graph: delayed, psf_graph: delayed, model_grap
         result[0].data += model_cube.data
         return image_scatter_channels(result[0], nchan)
     
-
     def deconvolve(dirty, psf, model):
         result = deconvolve_cube(dirty[0], psf[0], arl_config=arl_config)
         result[0].data += model.data
         return result[0]
-
+    
     algorithm = get_parameter(arl_config, "algorithm", 'mmclean')
     if algorithm == "mmclean" and nchan > 1:
         return delayed(make_cube_and_deconvolve, nout=nchan)(dirty_graph, psf_graph, model_graph)
@@ -490,11 +487,13 @@ def create_selfcal_graph_list(vis_graph_list, model_graph: delayed, c_predict_gr
     """
     
     model_vis_graph_list = create_zero_vis_graph_list(vis_graph_list)
-    model_vis_graph_list = c_predict_graph(model_vis_graph_list, model_graph, vis_slices=vis_slices, arl_config=arl_config)
+    model_vis_graph_list = c_predict_graph(model_vis_graph_list, model_graph, vis_slices=vis_slices,
+                                           arl_config=arl_config)
     return create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, arl_config=arl_config)
 
 
-def create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, global_solution=True, arl_config='arl_config.ini'):
+def create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, global_solution=True,
+                                arl_config='arl_config.ini'):
     """ Create a set of graphs for (optionally global) calibration of a list of visibilities
 
     If global solution is true then visibilities are gathered to a single visibility data set which is then
@@ -507,10 +506,10 @@ def create_calibrate_graph_list(vis_graph_list, model_vis_graph_list, global_sol
     :param arl_config: Parameters for functions in graphs
     :return:
     """
-
+    
     def solve_and_apply(vis, modelvis=None):
         return calibrate_function(vis, modelvis, arl_config=arl_config)[0]
-
+    
     if global_solution:
         point_vis_graph_list = [delayed(divide_visibility, nout=len(vis_graph_list))(vis_graph_list[i],
                                                                                      model_vis_graph_list[i])

@@ -16,6 +16,7 @@ from typing import Union
 import numpy
 
 from arl.data.data_models import GainTable
+from arl.data.parameters import get_parameter
 
 log = logging.getLogger(__name__)
 
@@ -29,13 +30,15 @@ def gaintable_null_iter(gt: GainTable, arl_config='arl_config.ini') -> numpy.nda
     yield numpy.ones_like(gt.time, dtype=bool)
 
 
-def gaintable_timeslice_iter(gt: GainTable, timeslice='auto', gt_slices=None) -> numpy.ndarray:
+def gaintable_timeslice_iter(gt: GainTable, arl_config='arl_config.ini') -> numpy.ndarray:
     """ W slice iterator
 
     :param wstack: wstack (wavelengths)
     :param gt_slices: Number of slices (second in precedence to wstack)
     :return: Boolean array with selected rows=True
     """
+    timeslice=get_parameter(arl_config, 'timeslice', 'auto', 'calibration')
+    gt_slices= get_parameter(arl_config, 'gt_slices', None, 'calibration')
     assert isinstance(gt, GainTable)
     timemin = numpy.min(gt.time)
     timemax = numpy.max(gt.time)

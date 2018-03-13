@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 def peel_skycomponent_blockvisibility(vis: BlockVisibility, sc: Union[Skycomponent, List[Skycomponent]],
-                                      remove=True, arl_config='arl_config.ini')\
+                                      arl_config='arl_config.ini')\
         -> (BlockVisibility, List[GainTable]):
     """ Peel a collection of components.
     
@@ -39,10 +39,9 @@ def peel_skycomponent_blockvisibility(vis: BlockVisibility, sc: Union[Skycompone
         
         modelvis = copy_visibility(vis, zero=True)
         modelvis = predict_skycomponent_visibility(modelvis, comp)
-        gt = solve_gaintable(vis, modelvis, phase_only=False, arl_config='arl_config.ini')
+        gt = solve_gaintable(vis, modelvis, arl_config='arl_config.ini')
         modelvis = apply_gaintable(modelvis, gt, arl_config='arl_config.ini')
-        if remove:
-            vis.data['vis'] -= modelvis.data['vis']
+        vis.data['vis'] -= modelvis.data['vis']
         gtlist.append(gt)
         
     return vis, gtlist

@@ -189,8 +189,8 @@ class TestTesting_Support(unittest.TestCase):
     def test_create_vis_iter(self):
         vis_iter = create_blockvisibility_iterator(self.config, self.times, self.frequency,
                                                    channel_bandwidth=self.channel_bandwidth,
-                                                   phasecentre=self.phasecentre,
-                                                   weight=1.0, polarisation_frame=PolarisationFrame('stokesI'),
+                                                   phasecentre=self.phasecentre, weight=1.0,
+                                                   polarisation_frame=PolarisationFrame('stokesI'),
                                                    integration_time=30.0, number_integrations=3)
         
         fullvis = None

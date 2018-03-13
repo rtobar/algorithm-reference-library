@@ -47,7 +47,7 @@ from arl.data.parameters import arl_path
 from arl.data.polarisation import PolarisationFrame
 from arl.image.operations import import_image_from_fits, create_image_from_array, \
     reproject_image, create_empty_image_like, qa_image
-from arl.imaging import predict_timeslice, predict_skycomponent_visibility, create_image_from_visibility, \
+from arl.imaging import predict_function, predict_skycomponent_visibility, create_image_from_visibility, \
     advise_wide_field
 from arl.skycomponent.operations import create_skycomponent, insert_skycomponent, apply_beam_to_skycomponent
 from arl.util.coordinate_support import xyz_at_latitude
@@ -591,7 +591,7 @@ def replicate_image(im: Image, polarisation_frame=PolarisationFrame('stokesI'), 
 def create_blockvisibility_iterator(config: Configuration, times: numpy.array, frequency: numpy.array,
                                     channel_bandwidth, phasecentre: SkyCoord, weight: float = 1,
                                     polarisation_frame=PolarisationFrame('stokesI'), integration_time=1.0,
-                                    number_integrations=1, predict=predict_timeslice, model=None, components=None,
+                                    number_integrations=1, context='timeslice', model=None, components=None,
                                     phase_error=0.0, amplitude_error=0.0, sleep=0.0):
     """ Create a sequence of Visibilities and optionally predicting and coalescing
 
@@ -628,7 +628,7 @@ def create_blockvisibility_iterator(config: Configuration, times: numpy.array, f
                                       channel_bandwidth=channel_bandwidth)
         
         if model is not None:
-            vis = predict(bvis, model, arl_config='arl_config.ini')
+            vis = predict_function(bvis, model, context=context, arl_config='arl_config.ini')
             bvis = convert_visibility_to_blockvisibility(vis)
         
         if components is not None:
@@ -763,7 +763,7 @@ def create_unittest_model(vis, model_pol, npixel=None, cellsize=None, nchan=1):
         cellsize = advice['cellsize']
     if npixel is None:
         npixel = advice['npixels2']
-    model = create_image_from_visibility(vis, npixel=npixel, cellsize=cellsize, nchan=nchan)
+    model = create_image_from_visibility(vis, npixel=npixel, cellsize=cellsize, nchan=nchan, polarisation_frame=model_pol)
     return model
 
 

@@ -24,9 +24,9 @@ from arl.visibility.operations import divide_visibility
 log = logging.getLogger(__name__)
 
 
-def solve_gaintable(vis: BlockVisibility, modelvis: BlockVisibility = None, gt=None, phase_only=True, niter=30,
-                    tol=1e-8,
-                    crosspol=False, arl_config='arl_config.ini') -> GainTable:
+def solve_gaintable(vis: BlockVisibility, modelvis: BlockVisibility = None, gt=None,
+                    phase_only=True, niter=30, tol=1e-8, crosspol=False,
+                    arl_config='arl_config.ini') -> GainTable:
     """Solve a gain table by fitting an observed visibility to a model visibility
     
     If modelvis is None, a point source model is assumed.
@@ -85,8 +85,8 @@ def solve_gaintable(vis: BlockVisibility, modelvis: BlockVisibility = None, gt=N
     return gt
 
 
-def solve_from_X(gt: GainTable, x: numpy.ndarray, xwt: numpy.ndarray, chunk, crosspol, niter, phase_only, tol, npol) \
-        -> GainTable:
+def solve_from_X(gt: GainTable, x: numpy.ndarray, xwt: numpy.ndarray, chunk,
+                 crosspol, niter, phase_only, tol, npol) -> GainTable:
     """ Solve for gains from the point source equivalents
 
     :param x: point source visibility
@@ -119,7 +119,8 @@ def solve_from_X(gt: GainTable, x: numpy.ndarray, xwt: numpy.ndarray, chunk, cro
     return gt
 
 
-def solve_antenna_gains_itsubs_scalar(gain, gwt, x, xwt, niter=30, tol=1e-8, phase_only=True, refant=0):
+def solve_antenna_gains_itsubs_scalar(gain, gwt, x, xwt, niter=30, tol=1e-8, phase_only=True,
+                                      refant=0):
     """Solve for the antenna gains
 
     x(antenna2, antenna1) = gain(antenna1) conj(gain(antenna2))
@@ -185,7 +186,8 @@ def gain_substitution_scalar(gain, x, xwt):
     return newgain, gwt
 
 
-def solve_antenna_gains_itsubs_vector(gain, gwt, x, xwt, niter=30, tol=1e-8, phase_only=True, refant=0):
+def solve_antenna_gains_itsubs_vector(gain, gwt, x, xwt, niter=30, tol=1e-8, phase_only=True,
+                                      refant=0):
     """Solve for the antenna gains using full matrix expressions
 
     x(antenna2, antenna1) = gain(antenna1) conj(gain(antenna2))
@@ -275,7 +277,8 @@ def gain_substitution_vector(gain, x, xwt):
     return newgain, gwt
 
 
-def solve_antenna_gains_itsubs_matrix(gain, gwt, x, xwt, niter=30, tol=1e-8, phase_only=True, refant=0):
+def solve_antenna_gains_itsubs_matrix(gain, gwt, x, xwt, niter=30, tol=1e-8, phase_only=True,
+                                      refant=0):
     """Solve for the antenna gains using full matrix expressions
 
     x(antenna2, antenna1) = gain(antenna1) conj(gain(antenna2))

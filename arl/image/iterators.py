@@ -13,7 +13,7 @@ from arl.image.operations import create_image_from_array
 log = logging.getLogger(__name__)
 
 
-def image_null_iter(im: Image, arl_config='arl_config.ini') -> numpy.ndarray:
+def image_null_iter(im: Image, facets=1) -> numpy.ndarray:
     """One time iterator
 
     :param im:
@@ -40,6 +40,7 @@ def image_raster_iter(im: Image, facets=1) -> Image:
     :param arl_config: throw away unwanted parameters
     """
 
+    facets = int(facets)
     log.debug("raster: predicting using %d x %d image partitions" % (facets, facets))
     assert facets <= im.nheight, "Cannot have more raster elements than pixels"
     assert facets <= im.nwidth, "Cannot have more raster elements than pixels"

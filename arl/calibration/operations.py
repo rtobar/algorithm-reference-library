@@ -9,6 +9,7 @@ import numpy.linalg
 
 from arl.data.data_models import GainTable, BlockVisibility, QA, assert_vis_gt_compatible
 from arl.data.data_models import ReceptorFrame
+from arl.data.parameters import get_parameter
 from arl.visibility.iterators import vis_timeslice_iter
 
 import logging
@@ -23,9 +24,7 @@ def gaintable_summary(gt: GainTable):
     return "%s rows, %.3f GB" % (gt.data.shape, gt.size())
 
 
-def create_gaintable_from_blockvisibility(vis: BlockVisibility, timeslice = None,
-                                          frequencyslice: float = None,
-                                          arl_config='arl_config.ini') -> GainTable:
+def create_gaintable_from_blockvisibility(vis: BlockVisibility, arl_config='arl_config.ini') -> GainTable:
     """ Create gain table from visibility.
     
     This makes an empty gain table consistent with the BlockVisibility.
@@ -40,6 +39,9 @@ def create_gaintable_from_blockvisibility(vis: BlockVisibility, timeslice = None
     
     nants = vis.nants
     
+    timeslice = get_parameter(arl_config, 'timeslice', 'auto', 'calibration')
+    frequencyslice = get_parameter(arl_config, 'frequencyslice', 'auto', 'calibration')
+
     if timeslice is None or timeslice == 'auto':
         utimes = numpy.unique(vis.time)
         ntimes = len(utimes)
@@ -86,8 +88,7 @@ def create_gaintable_from_blockvisibility(vis: BlockVisibility, timeslice = None
     return gt
 
 
-def apply_gaintable(vis: BlockVisibility, gt: GainTable, inverse=False, timeslice='auto') -> \
-        BlockVisibility:
+def apply_gaintable(vis: BlockVisibility, gt: GainTable, inverse=False, arl_config='arl_config.ini') -> BlockVisibility:
     """Apply a gain table to a block visibility
     
     The corrected visibility is::
@@ -103,6 +104,9 @@ def apply_gaintable(vis: BlockVisibility, gt: GainTable, inverse=False, timeslic
     :return: input vis with gains applied
     
     """
+    
+    timeslice = get_parameter(arl_config, 'timeslice', 'auto', 'calibration')
+
     assert isinstance(vis, BlockVisibility), "vis is not a BlockVisibility: %r" % vis
     assert isinstance(gt, GainTable), "gt is not a GainTable: %r" % gt
 

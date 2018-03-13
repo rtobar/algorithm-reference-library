@@ -18,7 +18,7 @@ from arl.image.operations import copy_image
 from arl.visibility.base import copy_visibility
 from arl.visibility.iterators import vis_wstack_iter
 from arl.visibility.coalesce import coalesce_visibility, decoalesce_visibility
-from arl.imaging.base import predict_2d_base, invert_2d_base
+from arl.imaging.base import predict_2d, invert_2d
 from arl.image.operations import create_w_term_like
 
 import logging
@@ -37,7 +37,7 @@ def predict_wstack_single(vis, model, remove=True, arl_config='arl_config.ini') 
 
     if not isinstance(vis, Visibility):
         log.debug("predict_wstack_single: Coalescing")
-        avis = coalesce_visibility(vis, arl_config=arl_config)
+        avis = coalesce_visibility(vis)
     else:
         avis = vis
         
@@ -55,11 +55,11 @@ def predict_wstack_single(vis, model, remove=True, arl_config='arl_config.ini') 
     
     # Do the real part
     workimage.data = w_beam.data.real * model.data
-    avis = predict_2d_base(avis, workimage, arl_config=arl_config)
+    avis = predict_2d(avis, workimage, arl_config=arl_config)
     
     # and now the imaginary part
     workimage.data = w_beam.data.imag * model.data
-    tempvis = predict_2d_base(tempvis, workimage, arl_config=arl_config)
+    tempvis = predict_2d(tempvis, workimage, arl_config=arl_config)
     avis.data['vis'] -= 1j * tempvis.data['vis']
     
     if not remove:
@@ -83,8 +83,8 @@ def invert_wstack_single(vis: Visibility, im: Image, dopsf, normalize=True, remo
     """
     log.debug("invert_wstack_single: predicting using single w slice")
     
-    d = {'imaginary': True, 'vis_slices':1, 'wstack':numpy.max(numpy.abs(vis.w))}
-    set_parameters(arl_config, d)
+    d = {'imaginary': True}
+    set_parameters(arl_config, d, 'imaging')
     
     assert isinstance(vis, Visibility), vis
     
@@ -92,7 +92,7 @@ def invert_wstack_single(vis: Visibility, im: Image, dopsf, normalize=True, remo
     w_average = numpy.average(vis.w)
     vis.data['uvw'][..., 2] -= w_average
     
-    reWorkimage, sumwt, imWorkimage = invert_2d_base(vis, im, dopsf, normalize=normalize, arl_config=arl_config)
+    reWorkimage, sumwt, imWorkimage = invert_2d(vis, im, dopsf, normalize=normalize, arl_config=arl_config)
     
     if not remove:
         vis.data['uvw'][..., 2] += w_average

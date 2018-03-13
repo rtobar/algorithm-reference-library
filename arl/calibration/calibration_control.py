@@ -11,7 +11,7 @@ import logging
 from arl.calibration.operations import create_gaintable_from_blockvisibility, apply_gaintable, qa_gaintable
 from arl.calibration.solvers import solve_gaintable
 from arl.data.data_models import Visibility
-from arl.data.parameters import set_parameters, get_parameter
+from arl.data.parameters import set_parameters
 from arl.visibility.coalesce import convert_visibility_to_blockvisibility, convert_blockvisibility_to_visibility
 
 log = logging.getLogger(__name__)
@@ -40,6 +40,7 @@ def create_calibration_controls(arl_config='arl_config.ini'):
                 'P': {'shape': 'matrix', 'timeslice': 1e4, 'phase_only': False, 'first_selfcal': 0},
                 'B': {'shape': 'vector', 'timeslice': 1e5, 'phase_only': False, 'first_selfcal': 0},
                 'I': {'shape': 'vector', 'timeslice': 1.0, 'phase_only': True, 'first_selfcal': 0}}
+    
     set_parameters(arl_config, controls, 'calibration')
 
     return controls

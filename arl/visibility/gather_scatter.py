@@ -58,8 +58,8 @@ def visibility_gather(visibility_list: List[Visibility], vis: Visibility, vis_it
     return vis
 
 
-def visibility_scatter_index(vis: Visibility, vis_slices) -> List[Visibility]:
-    return visibility_scatter(vis, vis_iter=vis_slice_iter(vis, vis_slices))
+def visibility_scatter_index(vis: Visibility, vis_slices=None, step=None) -> List[Visibility]:
+    return visibility_scatter(vis, vis_iter=vis_slice_iter(vis, vis_slices=vis_slices, step=step))
 
 
 def visibility_scatter_w(vis: Visibility, wstack=100.0) -> List[Visibility]:
@@ -76,8 +76,10 @@ def visibility_scatter_time(vis: Visibility, timeslice='auto') -> List[Visibilit
     return visibility_scatter(vis, vis_iter=vis_timeslice_iter(vis, timeslice=timeslice))
 
 
-def visibility_gather_index(visibility_list: List[Visibility], vis: Visibility, vis_slices=10000) -> Visibility:
-    return visibility_gather(visibility_list, vis, vis_iter=vis_slice_iter(vis, vis_slices=vis_slices))
+def visibility_gather_index(visibility_list: List[Visibility], vis: Visibility, vis_slices=None, step=None) -> \
+        Visibility:
+    return visibility_gather(visibility_list, vis, vis_iter=vis_slice_iter(vis, vis_slices=vis_slices,
+                                                                           step=step))
 
 
 def visibility_gather_w(visibility_list: List[Visibility], vis: Visibility, wstack=100.0) -> Visibility:

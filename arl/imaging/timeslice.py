@@ -29,7 +29,7 @@ from arl.data.data_models import Visibility, Image
 
 from arl.image.operations import copy_image
 
-from arl.imaging.base import predict_2d_base, invert_2d_base
+from arl.imaging.base import predict_2d, invert_2d
 from scipy.interpolate import griddata
 
 from arl.image.operations import create_empty_image_like
@@ -77,7 +77,7 @@ def fit_uvwplane(vis: Visibility, remove=False) -> (Image, float, float):
     return vis, p, q
 
 
-def predict_timeslice_single(vis: Visibility, model: Image, predict=predict_2d_base, remove=True,
+def predict_timeslice_single(vis: Visibility, model: Image, predict=predict_2d, remove=True,
                              arl_config='arl_config.ini') -> Visibility:
     """ Predict using a single time slices.
     
@@ -174,7 +174,7 @@ def invert_timeslice_single(vis: Visibility, im: Image, dopsf, normalize=True,
 
     avis, p, q = fit_uvwplane(avis, remove=True)
     
-    workimage, sumwt = invert_2d_base(avis, im, dopsf, normalize=normalize, arl_config=arl_config)
+    workimage, sumwt = invert_2d(avis, im, dopsf, normalize=normalize, arl_config=arl_config)
 
     finalimage = create_empty_image_like(im)
     

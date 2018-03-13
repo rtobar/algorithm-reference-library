@@ -17,6 +17,7 @@ The measurement equation for a wide field of view interferometer is:
 
 This and related modules contain various approachs for dealing with the wide-field problem where the
 extra phase term in the Fourier transform cannot be ignored.
+
 """
 
 import collections
@@ -30,7 +31,7 @@ from astropy import wcs
 from astropy.wcs.utils import pixel_to_skycoord
 
 from arl.data.data_models import Visibility, BlockVisibility, Image, Skycomponent, assert_same_chan_pol
-from arl.data.parameters import get_parameter
+from arl.data.parameters import get_parameter, set_parameters
 from arl.data.polarisation import convert_pol_frame, PolarisationFrame
 from arl.fourier_transforms.convolutional_gridding import convolutional_grid, \
     convolutional_degrid
@@ -99,7 +100,7 @@ def normalize_sumwt(im: Image, sumwt) -> Image:
     return im
 
 
-def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image, padding=2,
+def predict_2d(vis: Union[BlockVisibility, Visibility], model: Image,
                     arl_config='arl_config.ini') -> Union[BlockVisibility, Visibility]:
     """ Predict using convolutional degridding.
 
@@ -108,6 +109,7 @@ def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image, paddi
 
     :param vis: Visibility to be predicted
     :param model: model image
+    :param arl_config: File containing definitions of parameters
     :return: resulting visibility (in place works)
     """
     if isinstance(vis, BlockVisibility):
@@ -117,13 +119,16 @@ def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image, paddi
         avis = vis
     
     assert isinstance(avis, Visibility), avis
-    
+
+    kernel = get_parameter(arl_config, 'kernel', '2d', 'imaging')
+    padding = int(get_parameter(arl_config, 'padding', 2, 'imaging'))
+
     _, _, ny, nx = model.data.shape
     
     spectral_mode, vfrequencymap = get_frequency_map(avis, model)
     polarisation_mode, vpolarisationmap = get_polarisation_map(avis, model)
-    uvw_mode, shape, padding, vuvwmap = get_uvw_map(avis, model, padding)
-    kernel_name, gcf, vkernellist = get_kernel_list(avis, model, arl_config='arl_config.ini')
+    uvw_mode, shape, _ , vuvwmap = get_uvw_map(avis, model, padding)
+    gcf, vkernellist = get_kernel_list(avis, model, arl_config='arl_config.ini')
     
     uvgrid = fft((pad_mid(model.data, int(round(padding * nx))) * gcf).astype(dtype=complex))
     
@@ -140,19 +145,8 @@ def predict_2d_base(vis: Union[BlockVisibility, Visibility], model: Image, paddi
         return svis
 
 
-def predict_2d(vis: Visibility, im: Image, arl_config='arl_config.ini') -> Visibility:
-    """ Predict using convolutional degridding and w projection
-    
-    :param vis: Visibility to be predicted
-    :param model: model image
-    :return: resulting visibility (in place works)
-    """
-    log.debug("predict_2d: predict using 2d transform")
-    return predict_2d_base(vis, im, arl_config=arl_config)
-
-
-def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: bool = True,
-                   imaginary=False, padding=False, arl_config='arl_config.ini') \
+def invert_2d(vis: Visibility, im: Image, dopsf: bool = False, normalize: bool = True,
+                   arl_config='arl_config.ini') \
         -> (Image, numpy.ndarray):
     """ Invert using 2D convolution function, including w projection optionally
 
@@ -165,7 +159,7 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
     :param im: image template (not changed)
     :param dopsf: Make the psf instead of the dirty image
     :param normalize: Normalize by the sum of weights (True)
-    :return: resulting image
+    :return: resulting image, sum of weights
 
     """
     if not isinstance(vis, Visibility):
@@ -180,10 +174,13 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
     
     nchan, npol, ny, nx = im.data.shape
     
+    imaginary = bool(get_parameter(arl_config, 'imaginary', False, 'imaging'))
+    padding = int(get_parameter(arl_config, 'padding', 2, 'imaging'))
+    
     spectral_mode, vfrequencymap = get_frequency_map(svis, im)
     polarisation_mode, vpolarisationmap = get_polarisation_map(svis, im)
-    uvw_mode, shape, padding, vuvwmap = get_uvw_map(svis, im, padding)
-    kernel_name, gcf, vkernellist = get_kernel_list(svis, im, arl_config=arl_config)
+    uvw_mode, shape, _, vuvwmap = get_uvw_map(svis, im, padding)
+    gcf, vkernellist = get_kernel_list(svis, im, arl_config=arl_config)
     
     # Optionally pad to control aliasing
     imgridpad = numpy.zeros([nchan, npol, int(round(padding * ny)), int(round(padding * nx))], dtype='complex')
@@ -198,7 +195,7 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
     sumwt /= float(padding * int(round(padding * nx)) * ny)
     
     if imaginary:
-        log.debug("invert_2d_base: retaining imaginary part of dirty image")
+        log.debug("invert_2d: retaining imaginary part of dirty image")
         result = extract_mid(ifft(imgridpad) * gcf, npixel=nx)
         resultreal = create_image_from_array(result.real, im.wcs, im.polarisation_frame)
         resultimag = create_image_from_array(result.imag, im.wcs, im.polarisation_frame)
@@ -212,24 +209,6 @@ def invert_2d_base(vis: Visibility, im: Image, dopsf: bool = False, normalize: b
         if normalize:
             resultimage = normalize_sumwt(resultimage, sumwt)
         return resultimage, sumwt
-
-
-def invert_2d(vis: Visibility, im: Image, dopsf=False, normalize=True, arl_config='arl_config.ini') -> (Image, numpy.ndarray):
-    """ Invert using prolate spheroidal gridding function
-
-    Use the image im as a template. Do PSF in a separate call.
-
-    Note that the image is not normalised but the sum of the weights. This is for ease of use in partitioning.
-
-    :param vis: Visibility to be inverted
-    :param im: image template (not changed)
-    :param dopsf: Make the psf instead of the dirty image
-    :param normalize: Normalize by the sum of weights (True)
-    :return: resulting image[nchan, npol, ny, nx], sum of weights[nchan, npol]
-
-    """
-    log.debug("invert_2d: inverting using 2d transform")
-    return invert_2d_base(vis, im, dopsf, normalize=normalize, arl_config=arl_config)
 
 
 def predict_skycomponent_visibility(vis: Union[Visibility, BlockVisibility],

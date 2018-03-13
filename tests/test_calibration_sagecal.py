@@ -36,8 +36,7 @@ class TestCalibrationSagecal(unittest.TestCase):
         
         numpy.random.seed(180555)
     
-    def actualSetup(self, sky_pol_frame='stokesI', data_pol_frame='stokesI', f=None, vnchan=1, doiso=True,
-                    ntimes=1, flux_limit=2.0):
+    def actualSetup(self, vnchan=1, doiso=True, ntimes=1, flux_limit=2.0):
         
         nfreqwin = vnchan
         ntimes = ntimes
@@ -73,7 +72,7 @@ class TestCalibrationSagecal(unittest.TestCase):
         print("Number of components %d" % len(self.components))
         
         self.vis = copy_visibility(block_vis, zero=True)
-        gt = create_gaintable_from_blockvisibility(block_vis, timeslice='auto')
+        gt = create_gaintable_from_blockvisibility(block_vis, arl_config='arl_config.ini')
         for i, sc in enumerate(self.components):
             if sc.flux[0, 0] > 10:
                 sc.flux[...] /= 10.0

@@ -117,12 +117,9 @@ def create_predict_gleam_model_graph(vis_graph_list, frequency, channel_bandwidt
     
     predicted_vis_graph_list = list()
     for i, vis_graph in enumerate(vis_graph_list):
-        facets = {}
-        if get_parameter(arl_config, "facets", False):
-            facets = {'facets': get_parameter(arl_config, "facets", False)}
         model_graph = delayed(create_low_test_image_from_gleam)(vis_graph, frequency,
                                                                 channel_bandwidth, npixel=npixel,
-                                                                cellsize=cellsize, **facets)
+                                                                cellsize=cellsize)
         predicted_vis_graph_list.append(create_predict_graph([vis_graph], model_graph, arl_config='arl_config.ini')[0])
     return predicted_vis_graph_list
 

@@ -42,7 +42,7 @@ class TestPipelineGraphs(unittest.TestCase):
                        'padding': 2,
                        'oversampling': 2,
                        'kernel': '2d',
-                       'wstep': 4.0,
+                       'wstep': 0.0,
                        'vis_slices': 1,
                        'wstack': None,
                        'timeslice': 'auto'}

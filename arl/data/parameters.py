@@ -1,10 +1,8 @@
 """We use the standard configparser mechanism for arguments. For example::
 
     kernelname = get_parameter(arl_config, "kernel", "2d")
-    oversampling = get_parameter(arl_config, "oversampling", 8)
-    padding = get_parameter(arl_config, "padding", 2)
-
-The kwargs may need to be passed down to called functions.
+    oversampling = float(get_parameter(arl_config, "oversampling", 8))
+    padding = int(get_parameter(arl_config, "padding", 2))
 
 All functions possess an API which is always of the form::
 
@@ -17,6 +15,24 @@ arl_config.ini, or if a default is needed a function can be used::
     log = get_parameter(arl_config, 'log', None)
 
 Function parameters should obey a consistent naming convention:
+
+A typical file would look like::
+
+    [imaging]
+    npixel = 576
+    nchan = 1
+    reffrequency = 100000000.0
+    facets = 9
+    padding = 8
+    oversampling = 8
+    kernel = 2d
+    wstep = 4.0
+    wstack = 4.0
+    vis_slices = 10
+    timeslice = auto
+    timeslice = auto
+
+The typical naming for argument is:
 
 =======  =======
 Name     Meaning
@@ -52,6 +68,7 @@ spectral_mode           Visibility processing mode          'mfs' or 'channel'
 
 import logging
 import os
+import ast
 import configparser
 
 log = logging.getLogger(__name__)
@@ -72,14 +89,13 @@ def arl_path(path):
     return os.path.join(arlhome, path)
 
 
-def get_parameter(arl_config, key, default=None, section='DEFAULT'):
-    """ Get a specified named value for this (calling) function
-
-    The configfile is searched for in kwargs
+def get_parameter(arl_config, key=None, default=None, section='DEFAULT'):
+    """ Get a specified named value from the given section
 
     :param config: Parameter dictionary
     :param key: Key e.g. 'loop_gain'
     :param default: Default value
+    :param section: Section name e.g. 'imaging' or 'calibration'
     :return: result
     """
 
@@ -89,22 +105,62 @@ def get_parameter(arl_config, key, default=None, section='DEFAULT'):
     config = configparser.ConfigParser()
     config.read(arl_config)
     if section in config.keys():
-        return config[section].get(key, default)
+        try:
+            result = ast.literal_eval(config[section].get(key, default))
+        except SyntaxError:
+            result = config[section].get(key, default)
+        except ValueError:
+            result = config[section].get(key, default)
+        return result
     else:
         return default
+    
+def get_parameters(arl_config, section='DEFAULT'):
+    """ Get all values for a section
+
+    :param config: Parameter dictionary
+    :param section: Section name e.g. 'imaging' or 'calibration'
+    :return: result
+    """
+
+    config = configparser.ConfigParser()
+    config.read(arl_config)
+    result = {}
+    for key in config[section].keys():
+        try:
+            result[key] = ast.literal_eval(config[section][key])
+        except SyntaxError:
+            result[key] = config[section][key]
+        except ValueError:
+            result[key] = config[section][key]
+
+    return result
+
+def clear_parameters(arl_config, section='DEFAULT'):
+    """Clear a section of the parameters
+
+    :param arl_config: A config file
+    :param section: Section to write into
+    """
+    config = configparser.ConfigParser()
+    config.remove_section(section)
+    with open(arl_config, 'w') as configfile:
+        config.write(configfile)
 
 def set_parameters(arl_config, dict, section='DEFAULT'):
-    """ Get a specified named value for this (calling) function
+    """ Set a parameter
 
-    The configfile is searched for in kwargs
+    Write the dictionary dict into a configuration file
 
     :param arl_config: A config file
     :param dict:, dictionary of key:values
     :param section: Section to write into
+    :param reset: clear before retrieving
     :return: result
     """
     config = configparser.ConfigParser()
     config.read(arl_config)
+
     config[section] = dict
     with open(arl_config, 'w') as configfile:
         config.write(configfile)

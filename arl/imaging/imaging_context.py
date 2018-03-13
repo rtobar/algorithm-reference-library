@@ -14,7 +14,7 @@ from arl.data.data_models import Visibility, Image
 from arl.image.iterators import image_raster_iter, image_null_iter
 from arl.image.operations import create_empty_image_like
 from arl.imaging import normalize_sumwt
-from arl.imaging import predict_2d_base, invert_2d_base
+from arl.imaging import predict_2d, invert_2d
 from arl.imaging.timeslice import predict_timeslice_single, invert_timeslice_single
 from arl.imaging.wstack import predict_wstack_single, invert_wstack_single
 from arl.visibility.base import copy_visibility, create_visibility_from_rows
@@ -33,56 +33,66 @@ def imaging_contexts():
         predict: Predict function to be used
         invert: Invert function to be used
         image_iterator: Iterator for traversing images
+        image_iterator_args: Arguments for image_iter
         vis_iterator: Iterator for traversing visibilities
+        vis_iterator_args: Arguments for vis_iter
         inner: The innermost axis
     
     :return:
     """
-    contexts = {'2d': {'predict': predict_2d_base,
-                       'invert': invert_2d_base,
+    contexts = {'2d': {'predict': predict_2d,
+                       'invert': invert_2d,
                        'image_iterator': image_null_iter,
+                       'image_iterator_args': '',
                        'vis_iterator': vis_null_iter,
-                       'vis_iterator_args': None,
+                       'vis_iterator_args': '',
                        'inner': 'image'},
-                'facets': {'predict': predict_2d_base,
-                           'invert': invert_2d_base,
+                'facets': {'predict': predict_2d,
+                           'invert': invert_2d,
                            'image_iterator': image_raster_iter,
+                           'image_iterator_args': ['facets'],
                            'vis_iterator': vis_null_iter,
-                           'vis_iterator_args': None,
+                           'vis_iterator_args': '',
                            'inner': 'image'},
-                'facets_slice': {'predict': predict_2d_base,
-                                 'invert': invert_2d_base,
+                'facets_slice': {'predict': predict_2d,
+                                 'invert': invert_2d,
                                  'image_iterator': image_raster_iter,
+                                 'image_iterator_args': ['facets'],
                                  'vis_iterator': vis_slice_iter,
                                  'vis_iterator_args': ['vis_slices'],
                                  'inner': 'vis'},
                 'facets_timeslice': {'predict': predict_timeslice_single,
                                      'invert': invert_timeslice_single,
                                      'image_iterator': image_raster_iter,
+                                     'image_iterator_args': ['facets'],
                                      'vis_iterator': vis_timeslice_iter,
                                      'vis_iterator_args': ['timeslice'],
                                      'inner': 'image'},
                 'facets_wstack': {'predict': predict_wstack_single,
                                   'invert': invert_wstack_single,
                                   'image_iterator': image_raster_iter,
+                                  'image_iterator_args': ['facets'],
                                   'vis_iterator': vis_wstack_iter,
                                   'vis_iterator_args': ['wstack'],
                                   'inner': 'vis'},
-                'slice': {'predict': predict_2d_base,
-                          'invert': invert_2d_base,
+                'slice': {'predict': predict_2d,
+                          'invert': invert_2d,
                           'image_iterator': image_null_iter,
+                          'image_iterator_args': '',
                           'vis_iterator': vis_slice_iter,
                           'vis_iterator_args': ['vis_slices'],
                           'inner': 'image'},
                 'timeslice': {'predict': predict_timeslice_single,
                               'invert': invert_timeslice_single,
                               'image_iterator': image_null_iter,
+                              'image_iterator_args': '',
                               'vis_iterator': vis_timeslice_iter,
                               'vis_iterator_args': ['timeslice'],
                               'inner': 'image'},
                 'wstack': {'predict': predict_wstack_single,
                            'invert': invert_wstack_single,
                            'image_iterator': image_null_iter,
+                           'image_iterator_args': '',
                            'vis_iterator': vis_wstack_iter,
                            'vis_iterator_args': ['wstack'],
                            'inner': 'image'}}
@@ -98,7 +108,7 @@ def imaging_context(context='2d'):
 
 def make_vis_iter(vis, context, arl_config='arl_config.ini'):
     """Make the visibility iterator for this context
-    
+
     :param context:
     :param arl_config:
     :return:
@@ -107,14 +117,36 @@ def make_vis_iter(vis, context, arl_config='arl_config.ini'):
     vis_iter = c['vis_iterator']
     keys = c['vis_iterator_args']
     params = {}
-    if keys is not None:
+    if keys != '':
         for key in keys:
-            value=get_parameter(arl_config=arl_config, key=key, section='imaging')
+            value = get_parameter(arl_config=arl_config, key=key, section='imaging')
             params[key] = value
         
         return vis_iter(vis, **params)
     else:
         return vis_iter(vis)
+
+
+def make_image_iter(im, context, arl_config='arl_config.ini'):
+    """Make the image iterator for this context
+
+    :param im: Image
+    :param context:
+    :param arl_config:
+    :return:
+    """
+    c = imaging_context(context)
+    image_iter = c['image_iterator']
+    keys = c['image_iterator_args']
+    params = {}
+    if keys != '':
+        for key in keys:
+            value = get_parameter(arl_config=arl_config, key=key, section='imaging')
+            params[key] = value
+        
+        return image_iter(im, **params)
+    else:
+        return image_iter(im)
 
 
 def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', inner=None,
@@ -141,8 +173,6 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
     :return: Image, sum of weights
     """
     c = imaging_context(context)
-    vis_iter = c['vis_iterator']
-    image_iter = c['image_iterator']
     invert = c['invert']
     if inner is None:
         inner = c['inner']
@@ -156,14 +186,13 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
 
     if inner == 'image':
         totalwt = None
-        for rows in vis_iter(svis, arl_config=arl_config):
+        for rows in make_vis_iter(vis, context, arl_config=arl_config):
             if numpy.sum(rows):
                 visslice = create_visibility_from_rows(svis, rows)
                 sumwt = 0.0
                 workimage = create_empty_image_like(im)
-                for dpatch in image_iter(workimage, arl_config=arl_config):
-                    result, sumwt = invert(visslice, dpatch, dopsf, normalize=False,
-                                           arl_config=arl_config)
+                for dpatch in make_image_iter(workimage, context, arl_config=arl_config):
+                    result, sumwt = invert(visslice, dpatch, dopsf, normalize=False, arl_config=arl_config)
                     # Ensure that we fill in the elements of dpatch instead of creating a new numpy arrray
                     dpatch.data[...] = result.data[...]
                 # Assume that sumwt is the same for all patches
@@ -176,9 +205,9 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
         # We assume that the weight is the same for all image iterations
         totalwt = None
         workimage = create_empty_image_like(im)
-        for dpatch in image_iter(workimage, arl_config=arl_config):
+        for dpatch in make_image_iter(workimage, context, arl_config=arl_config):
             totalwt = None
-            for rows in vis_iter(svis, arl_config=arl_config):
+            for rows in make_vis_iter(svis, context, arl_config=arl_config):
                 if numpy.sum(rows):
                     visslice = create_visibility_from_rows(svis, rows)
                     result, sumwt = invert(visslice, dpatch, dopsf, normalize=False, arl_config=arl_config)
@@ -198,7 +227,8 @@ def invert_function(vis, im: Image, dopsf=False, normalize=True, context='2d', i
     return resultimage, totalwt
 
 
-def predict_function(vis, model: Image, context='2d', inner=None, arl_config='arl_config.ini') -> Visibility:
+def predict_function(vis, model: Image, context='2d', inner=None, kernel='2d', arl_config='arl_config.ini') -> \
+        Visibility:
     """Predict visibilities using algorithm specified by context
     
      * 2d: Two-dimensional transform
@@ -221,8 +251,6 @@ def predict_function(vis, model: Image, context='2d', inner=None, arl_config='ar
 
     """
     c = imaging_context(context)
-    vis_iter = c['vis_iterator']
-    image_iter = c['image_iterator']
     predict = c['predict']
     if inner is None:
         inner = c['inner']
@@ -235,19 +263,19 @@ def predict_function(vis, model: Image, context='2d', inner=None, arl_config='ar
     result = copy_visibility(vis, zero=True)
     
     if inner == 'image':
-        for rows in vis_iter(svis, arl_config=arl_config):
+        for rows in make_vis_iter(svis, context, arl_config=arl_config):
             if numpy.sum(rows):
                 visslice = create_visibility_from_rows(svis, rows)
                 visslice.data['vis'][...] = 0.0
                 # Iterate over images
-                for dpatch in image_iter(model, arl_config=arl_config):
+                for dpatch in make_image_iter(model, context, arl_config=arl_config):
                     result.data['vis'][...] = 0.0
                     result = predict(visslice, dpatch, arl_config=arl_config)
                     svis.data['vis'][rows] += result.data['vis']
     else:
         # Iterate over images
-        for dpatch in image_iter(model, arl_config=arl_config):
-            for rows in vis_iter(svis, arl_config=arl_config):
+        for dpatch in make_image_iter(model, context, arl_config=arl_config):
+            for rows in make_vis_iter(svis, context, arl_config=arl_config):
                 if numpy.sum(rows):
                     visslice = create_visibility_from_rows(svis, rows)
                     result.data['vis'][...] = 0.0

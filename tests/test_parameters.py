@@ -3,33 +3,30 @@
 
 """
 
+import logging
 import unittest
 
-from arl.data.parameters import get_parameter, set_parameters
-
-import logging
+from arl.data.parameters import get_parameter, get_parameters, set_parameters, clear_parameters
 
 log = logging.getLogger(__name__)
 
 
 class TestParameters(unittest.TestCase):
-    def setUp(self):
-        self.parameters = {'npixel': 256, 'cellsize': 0.1, 'spectral_mode': 'mfs'}
-        self.config_file = 'test_config.ini'
     
     def test_setgetparameters(self):
-        set_parameters(self.config_file, self.parameters)
-    
-        def t1(arl_config):
-            assert float(get_parameter(arl_config, 'cellsize')) == 0.1
-            assert get_parameter(arl_config, 'spectral_mode', 'channels') == 'mfs'
-            assert get_parameter(arl_config, 'null_mode', 'mfs') == 'mfs'
-            assert get_parameter(arl_config, 'foo', 'bar') == 'bar'
-            assert get_parameter(arl_config, 'foo') is None
-            assert get_parameter(None, 'foo', 'bar') == 'bar'
-    
-        t1(self.config_file)
-    
+        config_file = 'test_parameter.ini'
+        
+        set_parameters(config_file, {'npixel': 256, 'cellsize': 0.1, 'spectral_mode': 'mfs'}, 'mine')
+        set_parameters(config_file, {'gain': 0.1, 'algorithm': 'mmclean'}, 'yours')
+        assert len(get_parameters(config_file, 'mine')) == 3
+        assert len(get_parameters(config_file, 'yours')) == 2
+
+        assert float(get_parameter(config_file, 'cellsize', 0.0, section='mine')) == 0.1
+        assert get_parameter(config_file, 'spectral_mode', 'channels', section='mine') == 'mfs'
+        assert get_parameter(config_file, 'null_mode', 'mfs', section='mine') == 'mfs'
+        assert get_parameter(config_file, 'foo', 'bar', section='mine') == 'bar'
+        assert get_parameter(config_file, 'foo', section='mine') is None
+        assert get_parameter(None, 'foo', 'bar', section='mine') == 'bar'
 
 if __name__ == '__main__':
     unittest.main()

@@ -563,6 +563,8 @@ def convert_image_to_kernel(im: Image, oversampling, kernelwidth):
     naxis = len(im.shape)
     assert naxis == 4
     
+    kernelwidth = int(kernelwidth)
+    
     assert numpy.max(numpy.abs(im.data)) > 0.0, "Image is empty"
     
     nchan, npol, ny, nx = im.shape

@@ -23,24 +23,31 @@ For example to make dirty image and PSF, deconvolve, and then restore::
 
 """
 
-import numpy
 import logging
 
+import numpy
 from astropy.convolution import Gaussian2DKernel, convolve
 from photutils import fit_2dgaussian
 
 from arl.data.data_models import Image
+from arl.data.parameters import set_parameters, get_parameter
+from arl.image.cleaners import hogbom, msclean, msmfsclean
 from arl.image.operations import create_image_from_array, copy_image, \
     calculate_image_frequency_moments, calculate_image_from_frequency_moments
-
-from arl.image.cleaners import hogbom, msclean, msmfsclean
 
 log = logging.getLogger(__name__)
 
 
-def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter', niter=10000, gain=0.1,
-                    algorithm='hogbom', threshold=0.01, fractional_threshold=0.1, nmoments=1, scales=[0, 3, 10, 30],
-                    findpeak='ARL', return_moments=False, window_shape=None) -> (Image, Image):
+def deconvolve_args(arl_config='arl_config.ini'):
+    d = {'psf_support': 200, 'window': 'quarter', 'niter': 10000, 'gain': 0.1,
+         'algorithm': 'hogbom', 'threshold': 0.01, 'fractional_threshold': 0.1,
+         'nmoments': 1, 'scales': [0, 3, 10, 30],
+         'findpeak': 'ARL', 'return_moments': False, 'window_shape': ''}
+    
+    set_parameters(arl_config, d, 'deconvolution')
+
+
+def deconvolve_cube(dirty: Image, psf: Image, arl_config='arl_config.ini') -> (Image, Image):
     """ Clean using a variety of algorithms
     
     Functions that clean a dirty image using a point spread function. The algorithms available are:
@@ -74,6 +81,19 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
     :return: componentimage, residual
     
     """
+    psf_support = int(get_parameter(arl_config, 'psf_support', 200, 'deconvolution'))
+    gain = float(get_parameter(arl_config, 'gain', 0.1, 'deconvolution'))
+    niter = int(get_parameter(arl_config, 'niter', 1000, 'deconvolution'))
+    window = get_parameter(arl_config, 'window', 'quarter', 'deconvolution')
+    algorithm = get_parameter(arl_config, 'algorithm', 'hogbom', 'deconvolution')
+    threshold = float(get_parameter(arl_config, 'threshold', 0.01, 'deconvolution'))
+    fractional_threshold = float(get_parameter(arl_config, 'fractional_threshold', 0.1, 'deconvolution'))
+    nmoments = int(get_parameter(arl_config, 'nmoments', 1, 'deconvolution'))
+    findpeak = get_parameter(arl_config, 'findpeak', 'ARL', 'deconvolution')
+    return_moments = bool(get_parameter(arl_config, 'return_moments', False, 'deconvolution'))
+    window_shape = get_parameter(arl_config, 'window_shape', '', 'deconvolution')
+    scales = get_parameter(arl_config, 'scales', [0, 3, 10, 30], 'deconvolution')
+
     assert isinstance(dirty, Image), dirty
     assert isinstance(psf, Image), psf
     
@@ -90,7 +110,7 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
         if (psf_support < psf.shape[2] // 2) and ((psf_support < psf.shape[3] // 2)):
             centre = [psf.shape[2] // 2, psf.shape[3] // 2]
             psf.data = psf.data[..., (centre[0] - psf_support):(centre[0] + psf_support),
-                                (centre[1] - psf_support):(centre[1] + psf_support)]
+                       (centre[1] - psf_support):(centre[1] + psf_support)]
             log.info('deconvolve_cube: PSF support = +/- %d pixels' % (psf_support))
     
     if algorithm == 'msclean':
@@ -99,7 +119,7 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
         assert threshold >= 0.0
         assert niter > 0
         assert 0.0 < fractional_threshold < 1.0
-    
+        
         comp_array = numpy.zeros_like(dirty.data)
         residual_array = numpy.zeros_like(dirty.data)
         for channel in range(dirty.data.shape[0]):
@@ -116,10 +136,10 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
                                     window[channel, pol, :, :], gain, threshold, niter, scales, fractional_threshold)
                 else:
                     log.info("deconvolve_cube: Skipping pol %d, channel %d" % (pol, channel))
-                    
+        
         comp_image = create_image_from_array(comp_array, dirty.wcs, dirty.polarisation_frame)
         residual_image = create_image_from_array(residual_array, dirty.wcs, dirty.polarisation_frame)
-
+    
     elif algorithm == 'msmfsclean' or algorithm == 'mfsmsclean' or algorithm == 'mmclean':
         
         log.info("deconvolve_cube: Multi-scale multi-frequency clean of each polarisation separately")
@@ -128,7 +148,7 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
         assert nchan > 2 * nmoments, "Require nchan %d > 2 * nmoments %d" % (nchan, 2 * nmoments)
         dirty_taylor = calculate_image_frequency_moments(dirty, nmoments=nmoments)
         psf_taylor = calculate_image_frequency_moments(psf, nmoments=2 * nmoments)
-
+        
         assert 0.0 < gain < 2.0, "Loop gain must be between 0 and 2"
         comp_array = numpy.zeros(dirty_taylor.data.shape)
         residual_array = numpy.zeros(dirty_taylor.data.shape)
@@ -145,14 +165,14 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
                     window_taylor = numpy.zeros_like(dirty_taylor.data)
                     window_taylor[..., (qy + 1):3 * qy, (qx + 1):3 * qx] = 1.0
                     log.info('deconvolve_cube: Cleaning inner quarter of each moment plane')
-
+                    
                     comp_array[:, pol, :, :], residual_array[:, pol, :, :] = \
                         msmfsclean(dirty_taylor.data[:, pol, :, :], psf_taylor.data[:, pol, :, :],
                                    window_taylor[0, pol, :, :], gain, threshold, niter, scales, fractional_threshold,
                                    findpeak)
             else:
                 log.info("deconvolve_cube: Skipping pol %d" % (pol))
-                
+        
         comp_image = create_image_from_array(comp_array, dirty_taylor.wcs, dirty.polarisation_frame)
         residual_image = create_image_from_array(residual_array, dirty_taylor.wcs, dirty.polarisation_frame)
         
@@ -162,7 +182,7 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
             residual_image = calculate_image_from_frequency_moments(dirty, residual_image)
         else:
             log.info("deconvolve_cube: constructed moment cubes")
-            
+    
     elif algorithm == 'hogbom':
         log.info("deconvolve_cube: Hogbom clean of each polarisation and channel separately")
         
@@ -191,7 +211,7 @@ def deconvolve_cube(dirty: Image, psf: Image, psf_support=200, window='quarter',
     return comp_image, residual_image
 
 
-def restore_cube(model: Image, psf: Image, residual=None, psf_width=3.0) -> Image:
+def restore_cube(model: Image, psf: Image, residual=None, psf_width=3.0, arl_config='arl_config.ini') -> Image:
     """ Restore the model image to the residuals
 
     :params psf: Input PSF
@@ -201,11 +221,13 @@ def restore_cube(model: Image, psf: Image, residual=None, psf_width=3.0) -> Imag
     assert isinstance(model, Image), model
     assert isinstance(psf, Image), psf
     assert residual is None or isinstance(residual, Image), residual
-
+    
     restored = copy_image(model)
     
     npixel = psf.data.shape[3]
     sl = slice(npixel // 2 - 7, npixel // 2 + 8)
+    
+    psf_width = int(get_parameter(arl_config, 'psf_width', 3.0, 'deconvolution'))
     
     if psf_width is None:
         # isotropic at the moment!
@@ -222,7 +244,7 @@ def restore_cube(model: Image, psf: Image, residual=None, psf_width=3.0) -> Imag
             psf_width = 1.0
     else:
         log.debug('restore_cube: Using specified psfwidth = %s' % (psf_width))
-
+    
     # By convention, we normalise the peak not the integral so this is the volume of the Gaussian
     norm = 2.0 * numpy.pi * psf_width ** 2
     gk = Gaussian2DKernel(psf_width)

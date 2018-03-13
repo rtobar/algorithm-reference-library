@@ -38,7 +38,7 @@ def create_ical_pipeline_graph(vis_graph_list, model_graph: delayed, context='2d
     
     deconvolve_model_graph = create_deconvolve_graph(residual_graph, psf_graph, model_graph, arl_config=arl_config)
     
-    nmajor = get_parameter(arl_config, "nmajor", 5)
+    nmajor = float(get_parameter(arl_config, "nmajor", 5))
     if nmajor > 1:
         for cycle in range(nmajor):
             if do_selfcal:
@@ -82,7 +82,7 @@ def create_continuum_imaging_pipeline_graph(vis_graph_list, model_graph: delayed
     residual_graph = create_residual_graph(vis_graph_list, model_graph, context=context, arl_config=arl_config)
     deconvolve_model_graph = create_deconvolve_graph(residual_graph, psf_graph, model_graph, arl_config=arl_config)
     
-    nmajor = get_parameter(arl_config, "nmajor", 5)
+    nmajor = int(get_parameter(arl_config, "nmajor", 5))
     if nmajor > 1:
         for cycle in range(nmajor):
             residual_graph = create_residual_graph(vis_graph_list, deconvolve_model_graph, context=context,

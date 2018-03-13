@@ -43,8 +43,7 @@ import logging
 
 import numpy
 
-from dask import delayed
-
+from arl.data.parameters import get_parameter
 from arl.calibration.solvers import solve_gaintable
 from arl.calibration.operations import copy_gaintable, apply_gaintable, \
     create_gaintable_from_blockvisibility, qa_gaintable
@@ -67,7 +66,7 @@ def initialise_sagecal_thetas(vis: BlockVisibility, comps, arl_config='arl_confi
     :param gt:
     :return:
     """
-    gt = create_gaintable_from_blockvisibility(vis, arl_config='arl_config.ini')
+    gt = create_gaintable_from_blockvisibility(vis, arl_config=arl_config)
     return [(copy_skycomponent(sc), copy_gaintable(gt)) for sc in comps]
 
 
@@ -94,7 +93,7 @@ def sagecal_fit_component(vis, theta, gain=0.1, method='fit', arl_config='arl_co
 
     return new_comp
 
-def sagecal_fit_gaintable(evis, theta, gain=0.1, niter=3, tol=1e-3, arl_config='arl_config.ini'):
+def sagecal_fit_gaintable(evis, theta, arl_config='arl_config.ini'):
     """Fit a gaintable to a visibility i.e. A13
     
     This is the update to the gain part of the window
@@ -105,11 +104,15 @@ def sagecal_fit_gaintable(evis, theta, gain=0.1, niter=3, tol=1e-3, arl_config='
     :param niter: Number of iterations
     :param arl_config: Gaintable
     """
+    gain = float(get_parameter(arl_config, 'gain', 0.1, 'sagecal'))
+    niter = int(get_parameter(arl_config, 'niter', 3, 'sagecal'))
+    
     previous_gt = copy_gaintable(theta[1])
     gt = copy_gaintable(theta[1])
     model_vis = copy_visibility(evis, zero=True)
     model_vis = predict_skycomponent_visibility(model_vis, theta[0])
-    gt = solve_gaintable(evis, model_vis, gt=gt, niter=niter, phase_only=True, gain=0.5, tol=1e-4, arl_config=arl_config)
+    gt = solve_gaintable(evis, model_vis, gt=gt, niter=niter, phase_only=True, gain=0.5, tol=1e-4,
+                         arl_config=arl_config)
     gt.data['gain'][...] = gain * gt.data['gain'][...] + \
                            (1 - gain) * previous_gt.data['gain'][...]
     gt.data['gain'][...] /= numpy.abs(previous_gt.data['gain'][...])
