@@ -15,7 +15,8 @@ from arl.imaging import get_polarisation_map, get_uvw_map
 from arl.imaging.params import get_frequency_map
 
 
-def weight_visibility(vis: Visibility, im: Image, weighting='uniform', briggs=1.0, padding=False) -> Visibility:
+def weight_visibility(vis: Visibility, im: Image, weighting='uniform', briggs=1.0, padding=False,
+                      arl_config='imaging-wterm.ini') -> Visibility:
     """ Reweight the visibility data using a selected algorithm
 
     Imaging uses the column "imaging_weight" when imaging. This function sets that column using a

@@ -120,7 +120,6 @@ def predict_2d(vis: Union[BlockVisibility, Visibility], model: Image,
     
     assert isinstance(avis, Visibility), avis
 
-    kernel = get_parameter(arl_config, 'kernel', '2d', 'imaging')
     padding = int(get_parameter(arl_config, 'padding', 2, 'imaging'))
 
     _, _, ny, nx = model.data.shape
@@ -128,7 +127,7 @@ def predict_2d(vis: Union[BlockVisibility, Visibility], model: Image,
     spectral_mode, vfrequencymap = get_frequency_map(avis, model)
     polarisation_mode, vpolarisationmap = get_polarisation_map(avis, model)
     uvw_mode, shape, _ , vuvwmap = get_uvw_map(avis, model, padding)
-    gcf, vkernellist = get_kernel_list(avis, model, arl_config='arl_config.ini')
+    gcf, vkernellist = get_kernel_list(avis, model, arl_config=arl_config)
     
     uvgrid = fft((pad_mid(model.data, int(round(padding * nx))) * gcf).astype(dtype=complex))
     

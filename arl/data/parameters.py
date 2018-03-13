@@ -1,7 +1,7 @@
 """We use the standard configparser mechanism for arguments. For example::
 
     kernelname = get_parameter(arl_config, "kernel", "2d")
-    oversampling = float(get_parameter(arl_config, "oversampling", 8))
+    oversampling = float(get_parameter(arl_config, "oversampling", 1))
     padding = int(get_parameter(arl_config, "padding", 2))
 
 All functions possess an API which is always of the form::
@@ -24,7 +24,7 @@ A typical file would look like::
     reffrequency = 100000000.0
     facets = 9
     padding = 8
-    oversampling = 8
+    oversampling = 1
     kernel = 2d
     wstep = 4.0
     wstack = 4.0
@@ -104,14 +104,17 @@ def get_parameter(arl_config, key=None, default=None, section='DEFAULT'):
 
     config = configparser.ConfigParser()
     config.read(arl_config)
-    if section in config.keys():
-        try:
-            result = ast.literal_eval(config[section].get(key, default))
-        except SyntaxError:
-            result = config[section].get(key, default)
-        except ValueError:
-            result = config[section].get(key, default)
-        return result
+    if section in config:
+        if key in config[section]:
+            try:
+                result = ast.literal_eval(config[section].get(key, default))
+            except SyntaxError:
+                result = config[section].get(key, default)
+            except ValueError:
+                result = config[section].get(key, default)
+            return result
+        else:
+            return default
     else:
         return default
     

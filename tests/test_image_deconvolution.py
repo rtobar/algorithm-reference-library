@@ -13,6 +13,7 @@ from astropy.coordinates import SkyCoord
 from arl.data.parameters import set_parameters
 from arl.data.polarisation import PolarisationFrame
 from arl.image.cleaners import overlapIndices
+from arl.image import image_default_args
 from arl.image.deconvolution import deconvolve_cube, restore_cube
 from arl.image.operations import export_image_to_fits, create_image_from_array
 from arl.imaging.base import predict_2d, invert_2d, create_image_from_visibility
@@ -51,7 +52,8 @@ class TestImageDeconvolution(unittest.TestCase):
         window[..., 129:384, 129:384] = True
         self.innerquarter = create_image_from_array(window, self.model.wcs, polarisation_frame=PolarisationFrame(
             'stokesI'))
-        self.ini = '%s/test_deconvoliution_config.ini' % self.dir
+        self.ini = '%s/test_deconvolution_config.ini' % self.dir
+        image_default_args(self.ini)
     
     def overlaptest(self, a1, a2, s1, s2):
         #

@@ -104,8 +104,8 @@ def sagecal_fit_gaintable(evis, theta, arl_config='arl_config.ini'):
     :param niter: Number of iterations
     :param arl_config: Gaintable
     """
-    gain = float(get_parameter(arl_config, 'gain', 0.1, 'sagecal'))
-    niter = int(get_parameter(arl_config, 'niter', 3, 'sagecal'))
+    gain = float(get_parameter(arl_config, 'gain', 0.1, 'calibration'))
+    niter = int(get_parameter(arl_config, 'niter', 3, 'calibration'))
     
     previous_gt = copy_gaintable(theta[1])
     gt = copy_gaintable(theta[1])

@@ -73,7 +73,7 @@ def imaging_contexts():
                                   'image_iterator': image_raster_iter,
                                   'image_iterator_args': ['facets'],
                                   'vis_iterator': vis_wstack_iter,
-                                  'vis_iterator_args': ['wstack'],
+                                  'vis_iterator_args': ['vis_slices'],
                                   'inner': 'vis'},
                 'slice': {'predict': predict_2d,
                           'invert': invert_2d,
@@ -94,7 +94,7 @@ def imaging_contexts():
                            'image_iterator': image_null_iter,
                            'image_iterator_args': '',
                            'vis_iterator': vis_wstack_iter,
-                           'vis_iterator_args': ['wstack'],
+                           'vis_iterator_args': ['vis_slices'],
                            'inner': 'image'}}
     
     return contexts

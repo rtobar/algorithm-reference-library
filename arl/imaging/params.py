@@ -219,7 +219,7 @@ def get_kernel_list(vis: Visibility, im: Image, arl_config='arl_config.ini'):
         fov = cellsize * npixel * padding
         r_f = (cellsize * npixel / 2) ** 2 / abs(cellsize)
         log.debug("get_kernel_list: Fresnel number = %f" % (r_f))
-        delA = float(get_parameter(arl_config, 'wloss', 0.02))
+        delA = float(get_parameter(arl_config, 'wloss', 0.02, section='imaging'))
         
         advice = advise_wide_field(vis, delA)
         wstep = float(get_parameter(arl_config, 'wstep', advice['w_sampling_primary_beam'], 'imaging'))
@@ -228,7 +228,7 @@ def get_kernel_list(vis: Visibility, im: Image, arl_config='arl_config.ini'):
  
         # Now calculate the maximum support for the w kernel
         kernelwidth = \
-            float(get_parameter(arl_config, "kernelwidth",
+            int(get_parameter(arl_config, "kernelwidth",
                           (2 * int(round(numpy.sin(0.5 * fov) * npixel * wabsmax * cellsize))),
                           'imaging'))
         kernelwidth = max(kernelwidth, 8)

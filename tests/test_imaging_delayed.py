@@ -22,6 +22,9 @@ from arl.skycomponent.operations import insert_skycomponent
 from arl.util.testing_support import create_named_configuration, ingest_unittest_visibility, create_unittest_model, \
     create_unittest_components, insert_unittest_errors
 from arl.visibility.operations import qa_visibility
+from arl.data.parameters import get_parameter, set_parameters
+from arl import arl_default_args
+
 
 log = logging.getLogger(__name__)
 
@@ -35,19 +38,20 @@ class TestImagingDelayed(unittest.TestCase):
         self.compute = True
         self.dir = './test_results'
         os.makedirs(self.dir, exist_ok=True)
-        self.params = {'npixel': 512,
-                       'nchan': 1,
-                       'reffrequency': 1e8,
-                       'facets': 1,
-                       'padding': 2,
-                       'oversampling': 2,
-                       'kernel': '2d',
-                       'wstep': 0.0,
-                       'vis_slices': 1,
-                       'wstack': None,
-                       'timeslice': 'auto'}
+        self.npixel = 512
+        self.params = {
+            'facets': 1,
+            'padding': 2,
+            'oversampling': 1,
+            'wstep': 0.0,
+            'wstack': 4.0,
+            'timeslice': 'auto'}
+        self.ini = '%s/test_imaging_delayed_config.ini' % self.dir
+        arl_default_args(self.ini)
+        set_parameters(self.ini, self.params, 'imaging')
     
     def actualSetUp(self, add_errors=False, freqwin=7, block=False, dospectral=True, dopol=False):
+        set_parameters(self.ini, self.params, 'imaging')
         self.low = create_named_configuration('LOWBD2', rmax=750.0)
         self.freqwin = freqwin
         self.vis_graph_list = list()
@@ -85,7 +89,7 @@ class TestImagingDelayed(unittest.TestCase):
         
         self.model_graph = [delayed(create_unittest_model, nout=freqwin)(self.vis_graph_list[freqwin],
                                                                          self.image_pol,
-                                                                         npixel=self.params['npixel'])
+                                                                         npixel=self.npixel)
                             for freqwin, _ in enumerate(self.frequency)]
         
         self.components_graph = [delayed(create_unittest_components)(self.model_graph[freqwin],
@@ -119,9 +123,7 @@ class TestImagingDelayed(unittest.TestCase):
     
     def _invert_base(self, context='2d', extra='', flux_max=100.0, flux_min=-0.2, flux_tolerance=5.0):
         dirty_graph = create_invert_graph(self.vis_graph_list, self.model_graph,
-                                          context=context,
-                                          dopsf=False, normalize=True,
-                                          arl_config=self.ini)
+                                          context=context, dopsf=False, normalize=True, arl_config=self.ini)
         
         if self.compute:
             dirty = dirty_graph[0].compute()
@@ -286,14 +288,14 @@ class TestImagingDelayed(unittest.TestCase):
         psf_graph = create_invert_graph(self.vis_graph_list, self.model_graph,
                                         context='wstack', vis_slices=51,
                                         dopsf=True, normalize=True)
-        dec_graph = create_deconvolve_graph(dirty_graph, psf_graph, self.model_graph, niter=1000,
-                                            fractional_threshold=0.1, scales=[0, 3, 10],
-                                            algorithm='mmclean', nmoments=3, nchan=self.freqwin,
-                                            threshold=0.1, nmajor=0, gain=0.7)
+        set_parameters(self.ini, {'nchan': self.freqwin, 'vis_slices': 11}, 'imaging')
+        set_parameters(self.ini, {'algorithm': 'mmclean', 'nmoments': 3, 'niter': 1000, 'fractional_threshold': 0.1,
+                                  'threshold': 2.0, 'nmajor': 0, 'gain': 0.7, 'scales':[0, 3, 10]}, 'deconvolution')
+        dec_graph = create_deconvolve_graph(dirty_graph, psf_graph, self.model_graph, arl_config=self.ini)
         residual_graph = create_residual_graph(self.vis_graph_list, model_graph=dec_graph,
-                                               context='wstack', vis_slices=51)
+                                               context='wstack', arl_config=self.ini)
         rest_graph = create_restore_graph(model_graph=dec_graph, psf_graph=psf_graph, residual_graph=residual_graph,
-                                          empty=self.model_graph)
+                                          arl_config=self.ini)
         restored = rest_graph[0].compute()
         export_image_to_fits(restored, '%s/test_imaging_delayed_mmclean_restored.fits' % self.dir)
 

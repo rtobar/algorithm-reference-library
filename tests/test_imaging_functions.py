@@ -14,6 +14,7 @@ from arl.data.parameters import set_parameters
 from arl.data.polarisation import PolarisationFrame
 from arl.image.operations import export_image_to_fits, create_empty_image_like, smooth_image
 from arl.imaging import predict_2d, invert_2d, create_image_from_visibility, predict_skycomponent_visibility
+from arl import arl_default_args
 from arl.imaging.imaging_context import predict_function, invert_function, make_vis_iter, \
     make_image_iter, imaging_contexts
 from arl.imaging.weighting import weight_visibility
@@ -35,12 +36,13 @@ class TestImagingFunctions(unittest.TestCase):
         self.imaging_params = {
             'facets': 1,
             'padding': 2,
-            'oversampling': 8,
+            'oversampling': 1,
             'wstep': 0.0,
             'wstack': 4.0,
             'vis_slices': 10,
             'timeslice': 'auto'}
         self.ini = '%s/test_imaging_config.ini' % self.dir
+        arl_default_args(self.ini)
         set_parameters(self.ini, self.imaging_params, 'imaging')
     
     def actualSetUp(self, add_errors=False, freqwin=1, block=False, dospectral=True, dopol=False):

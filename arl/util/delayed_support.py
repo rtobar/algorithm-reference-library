@@ -120,7 +120,7 @@ def create_predict_gleam_model_graph(vis_graph_list, frequency, channel_bandwidt
         model_graph = delayed(create_low_test_image_from_gleam)(vis_graph, frequency,
                                                                 channel_bandwidth, npixel=npixel,
                                                                 cellsize=cellsize)
-        predicted_vis_graph_list.append(create_predict_graph([vis_graph], model_graph, arl_config='arl_config.ini')[0])
+        predicted_vis_graph_list.append(create_predict_graph([vis_graph], model_graph, arl_config=arl_config)[0])
     return predicted_vis_graph_list
 
 
@@ -135,8 +135,8 @@ def create_corrupt_vis_graph(vis_graph_list, gt_graph=None, arl_config='arl_conf
     
     def corrupt_vis(vis, gt, arl_config='arl_config.ini'):
         if gt is None:
-            gt = create_gaintable_from_blockvisibility(vis, arl_config='arl_config.ini')
+            gt = create_gaintable_from_blockvisibility(vis, arl_config=arl_config)
             gt = simulate_gaintable(gt, arl_config='arl_config.ini')
         return apply_gaintable(vis, gt)
     
-    return [delayed(corrupt_vis, nout=1)(vis_graph, gt_graph, arl_config='arl_config.ini') for vis_graph in vis_graph_list]
+    return [delayed(corrupt_vis, nout=1)(vis_graph, gt_graph, arl_config=arl_config) for vis_graph in vis_graph_list]

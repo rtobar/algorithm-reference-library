@@ -29,10 +29,10 @@ def ical(block_vis: BlockVisibility, model: Image, components=None, context='2d'
     :param controls: Calibration controls dictionary
     :return: model, residual, restored
     """
-    nmajor = int(get_parameter(arl_config, 'nmajor', 5))
+    nmajor = int(get_parameter(arl_config, 'nmajor', 5, 'pipelines'))
     log.info("ical: Performing %d major cycles" % nmajor)
     
-    do_selfcal = bool(get_parameter(arl_config, "do_selfcal", False))
+    do_selfcal = bool(get_parameter(arl_config, "do_selfcal", False, 'pipelines'))
 
     if controls is None:
         controls = create_calibration_controls(arl_config)
@@ -59,7 +59,7 @@ def ical(block_vis: BlockVisibility, model: Image, components=None, context='2d'
     
     psf, sumwt = invert_function(visres, model, dopsf=True, context=context, arl_config=arl_config)
     
-    threshold = float(get_parameter(arl_config, "threshold", 0.0))
+    threshold = float(get_parameter(arl_config, "threshold", 0.0, section='pipelines'))
     
     for i in range(nmajor):
         log.info("ical: Start of major cycle %d of %d" % (i, nmajor))

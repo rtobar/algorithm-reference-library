@@ -8,7 +8,7 @@ from arl.imaging import imaging_default_args
 from arl.pipelines import pipelines_default_args
 from arl.visibility import visibility_default_args
 
-def init_default_args(arl_config='arl_config.ini'):
+def arl_default_args(arl_config='arl_config.ini'):
 
     calibration_default_args(arl_config)
     graphs_default_args(arl_config)

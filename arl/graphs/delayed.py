@@ -47,7 +47,8 @@ from arl.image.gather_scatter import image_scatter_facets, image_gather_facets, 
     image_gather_channels
 from arl.image.operations import copy_image, create_empty_image_like
 from arl.imaging import normalize_sumwt
-from arl.imaging.imaging_context import imaging_context, make_vis_iter, make_image_iter
+from arl.imaging.imaging_context import imaging_context, make_vis_iter, make_image_iter, \
+    predict_function, invert_function
 from arl.imaging.weighting import weight_visibility
 from arl.visibility.base import copy_visibility, create_visibility_from_rows
 from arl.visibility.coalesce import coalesce_visibility, decoalesce_visibility
@@ -187,21 +188,21 @@ def create_weight_vis_graph_list(vis_graph_list, model_graph, weighting='uniform
 
 
 def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=False, normalize=True,
-                        facets=1, vis_slices=None, context='2d', arl_config='arl_config.ini') -> delayed:
+                        context='2d', arl_config='arl_config.ini') -> delayed:
     """ Sum results from invert, iterating over the scattered image and vis_graph_list
 
     :param vis_graph_list:
     :param template_model_graph: Model used to determine image parameters
     :param dopsf: Make the PSF instead of the dirty image
-    :param facets: Number of facets
     :param normalize: Normalize by sumwt
-    :param vis_slices: Number of slices
     :param context: Imaging context
     :param arl_config: Parameters for functions in graphs
     :return: delayed for invert
    """
+    
+    vis_slices = get_parameter(arl_config, 'vis_slices', 1, 'imaging')
+    facets = get_parameter(arl_config, 'facets', 1, 'imaging')
     c = imaging_context(context)
-    invert = c['invert']
     inner = c['inner']
     
     def scatter_vis(vis):
@@ -232,7 +233,7 @@ def create_invert_graph(vis_graph_list, template_model_graph: delayed, dopsf=Fal
     
     def invert_ignore_none(vis, model):
         if vis is not None:
-            return invert(vis, model, context=context, dopsf=dopsf, normalize=normalize, arl_config=arl_config)
+            return invert_function(vis, model, context=context, dopsf=dopsf, normalize=normalize, arl_config=arl_config)
         else:
             return create_empty_image_like(model), 0.0
     
@@ -280,13 +281,11 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, vis_slices=1, fac
     :return: List of vis_graphs
    """
     c = imaging_context(context)
-    predict = c['predict']
-    inner = c['inner']
     
     def predict_ignore_none(vis, model):
         if vis is not None:
             predicted = copy_visibility(vis)
-            predicted = predict(predicted, model, context=context, arl_config=arl_config)
+            predicted = predict_function(predicted, model, context=context, arl_config=arl_config)
             return predicted
         else:
             return None
@@ -381,7 +380,7 @@ def create_deconvolve_graph(dirty_graph: delayed, psf_graph: delayed, model_grap
     :param arl_config: Parameters for functions in graphs
     :return:
     """
-    nchan = int(get_parameter(arl_config, "nchan", 1))
+    nchan = int(get_parameter(arl_config, "nchan", 1, section='graphs'))
     
     def remove_sumwt(dirty_list):
         return [d[0] for d in dirty_list]
@@ -399,7 +398,7 @@ def create_deconvolve_graph(dirty_graph: delayed, psf_graph: delayed, model_grap
         result[0].data += model.data
         return result[0]
     
-    algorithm = get_parameter(arl_config, "algorithm", 'mmclean')
+    algorithm = get_parameter(arl_config, "algorithm", 'mmclean', section='graphs')
     if algorithm == "mmclean" and nchan > 1:
         return delayed(make_cube_and_deconvolve, nout=nchan)(dirty_graph, psf_graph, model_graph)
     else:

@@ -43,7 +43,7 @@ from scipy import interpolate
 from arl.calibration.calibration_control import create_calibration_controls
 from arl.calibration.operations import create_gaintable_from_blockvisibility, apply_gaintable
 from arl.data.data_models import Configuration, Image, GainTable, Skycomponent
-from arl.data.parameters import arl_path
+from arl.data.parameters import arl_path, get_parameter, set_parameters
 from arl.data.polarisation import PolarisationFrame
 from arl.image.operations import import_image_from_fits, create_image_from_array, \
     reproject_image, create_empty_image_like, qa_image
@@ -61,8 +61,7 @@ def create_configuration_from_file(antfile: str, location: EarthLocation = None,
                                    mount: str = 'altaz',
                                    names: str = "%d", frame: str = 'local',
                                    diameter=35.0,
-                                   rmax=None,
-                                   arl_config='arl_config.ini') -> Configuration:
+                                   rmax=None) -> Configuration:
     """ Define from a file
 
     :param names:
@@ -95,7 +94,7 @@ def create_configuration_from_file(antfile: str, location: EarthLocation = None,
     return fc
 
 
-def create_LOFAR_configuration(antfile: str, meta: dict = None) -> Configuration:
+def create_LOFAR_configuration(antfile: str) -> Configuration:
     """ Define from the LOFAR configuration file
 
     :param antfile:
@@ -592,7 +591,7 @@ def create_blockvisibility_iterator(config: Configuration, times: numpy.array, f
                                     channel_bandwidth, phasecentre: SkyCoord, weight: float = 1,
                                     polarisation_frame=PolarisationFrame('stokesI'), integration_time=1.0,
                                     number_integrations=1, context='timeslice', model=None, components=None,
-                                    phase_error=0.0, amplitude_error=0.0, sleep=0.0):
+                                    phase_error=0.0, amplitude_error=0.0, sleep=0.0, arl_config='arl_config.ini'):
     """ Create a sequence of Visibilities and optionally predicting and coalescing
 
     This is useful mainly for performing large simulations. Do something like::
@@ -628,7 +627,7 @@ def create_blockvisibility_iterator(config: Configuration, times: numpy.array, f
                                       channel_bandwidth=channel_bandwidth)
         
         if model is not None:
-            vis = predict_function(bvis, model, context=context, arl_config='arl_config.ini')
+            vis = predict_function(bvis, model, context=context, arl_config=arl_config)
             bvis = convert_visibility_to_blockvisibility(vis)
         
         if components is not None:

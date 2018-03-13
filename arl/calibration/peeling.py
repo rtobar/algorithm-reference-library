@@ -39,8 +39,8 @@ def peel_skycomponent_blockvisibility(vis: BlockVisibility, sc: Union[Skycompone
         
         modelvis = copy_visibility(vis, zero=True)
         modelvis = predict_skycomponent_visibility(modelvis, comp)
-        gt = solve_gaintable(vis, modelvis, arl_config='arl_config.ini')
-        modelvis = apply_gaintable(modelvis, gt, arl_config='arl_config.ini')
+        gt = solve_gaintable(vis, modelvis, arl_config=arl_config)
+        modelvis = apply_gaintable(modelvis, gt, arl_config=arl_config.ini)
         vis.data['vis'] -= modelvis.data['vis']
         gtlist.append(gt)
         

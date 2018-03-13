@@ -24,4 +24,4 @@ def run_unittests(logLevel=logging.DEBUG, *args, arl_config='arl_config.ini'):
     rootLog.addHandler(logging.StreamHandler(sys.stderr))
 
     # Call unittest main
-    unittest.main(*args, arl_config='arl_config.ini')
+    unittest.main(*args, arl_config=arl_config)

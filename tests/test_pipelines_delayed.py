@@ -13,6 +13,8 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from dask import delayed
 
+from arl.data.parameters import get_parameter, set_parameters
+from arl import arl_default_args
 from arl.calibration.calibration_control import create_calibration_controls
 from arl.data.polarisation import PolarisationFrame
 from arl.image.operations import export_image_to_fits, smooth_image, qa_image
@@ -35,18 +37,19 @@ class TestPipelineGraphs(unittest.TestCase):
         self.compute = True
         self.dir = './test_results'
         os.makedirs(self.dir, exist_ok=True)
-        self.params = {'npixel': 512,
-                       'nchan': 1,
-                       'reffrequency': 1e8,
-                       'facets': 1,
-                       'padding': 2,
-                       'oversampling': 2,
-                       'kernel': '2d',
-                       'wstep': 0.0,
-                       'vis_slices': 1,
-                       'wstack': None,
-                       'timeslice': 'auto'}
-    
+        self.npixel = 512
+        self.params = {
+            'facets': 1,
+            'padding': 2,
+            'oversampling': 1,
+            'wstep': 0.0,
+            'wstack': 4.0,
+            'vis_slices': 11,
+            'timeslice': 'auto'}
+        self.ini = '%s/test_imaging_config.ini' % self.dir
+        arl_default_args(self.ini)
+        set_parameters(self.ini, self.params, 'imaging')
+     
     def actualSetUp(self, add_errors=False, freqwin=7, block=False, dospectral=True, dopol=False):
         self.low = create_named_configuration('LOWBD2', rmax=750.0)
         self.freqwin = freqwin
@@ -84,7 +87,7 @@ class TestPipelineGraphs(unittest.TestCase):
                                for i, _ in enumerate(self.frequency)]
         
         self.model_graph = [delayed(create_unittest_model, nout=freqwin)(self.vis_graph_list[0], self.image_pol,
-                                                                         npixel=self.params['npixel'])
+                                                                         npixel=self.npixel)
                             for i, _ in enumerate(self.frequency)]
         
         self.components_graph = [delayed(create_unittest_components)(self.model_graph[i], flux[i, :][numpy.newaxis, :])
@@ -113,12 +116,12 @@ class TestPipelineGraphs(unittest.TestCase):
         # Note that the image is poor because we set the number of wstack's to be smaller than
         # recommended. Setting it to e.g. 51 gives a better image but at the cost of longer run time.
         self.actualSetUp(add_errors=False, block=True)
+        set_parameters(self.ini, {'nchan':self.freqwin, 'vis_slices':11}, 'imaging')
+        set_parameters(self.ini, {'algorithm':'mmclean', 'nmoments':3, 'niter':1000, 'fractional_threshold':0.1,
+                                  'threshold':2.0, 'nmajor':0, 'gain':0.1}, 'imaging')
         continuum_imaging_graph = \
             create_continuum_imaging_pipeline_graph(self.vis_graph_list, model_graph=self.model_graph,
-                                                    algorithm='mmclean',
-                                                    nmoments=3, nchan=self.freqwin,
-                                                    context='wstack', niter=1000, fractional_threshold=0.1,
-                                                    threshold=2.0, nmajor=0, gain=0.1, vis_slices=11)
+                                                    context='wstack', arl_config=self.ini)
         if self.compute:
             clean, residual, restored = continuum_imaging_graph.compute()
             export_image_to_fits(clean[0], '%s/test_pipelines_continuum_imaging_pipeline_clean.fits' % self.dir)
@@ -144,11 +147,14 @@ class TestPipelineGraphs(unittest.TestCase):
         controls['G']['timescale'] = 'auto'
         controls['B']['timescale'] = 1e5
     
+        set_parameters(self.ini, {'nchan':self.freqwin, 'vis_slices':11}, 'imaging')
+        set_parameters(self.ini, {'algorithm':'mmclean', 'nmoments':3, 'niter':1000, 'fractional_threshold':0.1,
+                                  'threshold':2.0, 'nmajor':0, 'gain':0.1}, 'imaging')
+        set_parameters(self.ini, {'nmajor':6, 'do_selfcal':True, 'global_solution': False}, 'pipelines')
         ical_graph = \
             create_ical_pipeline_graph(self.vis_graph_list, model_graph=self.model_graph, context='wstack',
-                                       do_selfcal=True, global_solution=False, algorithm='mmclean', vis_slices=11,
-                                       facets=1, niter=1000, fractional_threshold=0.1, nmoments=3, nchan=self.freqwin,
-                                       threshold=2.0, nmajor=6, gain=0.1)
+                                       arl_config=self.ini)
+        
         if self.compute:
             clean, residual, restored = ical_graph.compute()
             export_image_to_fits(clean[0], '%s/test_pipelines_ical_pipeline_clean.fits' % self.dir)
@@ -172,11 +178,13 @@ class TestPipelineGraphs(unittest.TestCase):
         controls['G']['timescale'] = 'auto'
         controls['B']['timescale'] = 1e5
     
+        set_parameters(self.ini, {'nchan':self.freqwin, 'vis_slices':11}, 'imaging')
+        set_parameters(self.ini, {'algorithm':'mmclean', 'nmoments':3, 'niter':1000, 'fractional_threshold':0.1,
+                                  'threshold':2.0, 'nmajor':0, 'gain':0.1}, 'imaging')
+        set_parameters(self.ini, {'nmajor':6, 'do_selfcal':True, 'global_solution': True}, 'pipelines')
         ical_graph = \
             create_ical_pipeline_graph(self.vis_graph_list, model_graph=self.model_graph, context='wstack',
-                                       do_selfcal=True, global_solution=False, algorithm='mmclean', vis_slices=11,
-                                       facets=1, niter=1000, fractional_threshold=0.1, nmoments=3, nchan=self.freqwin,
-                                       threshold=2.0, nmajor=6, gain=0.1, do_global=True)
+                                       arl_config=self.ini)
         if self.compute:
             clean, residual, restored = ical_graph.compute()
             export_image_to_fits(clean[0], '%s/test_pipelines_ical_global_pipeline_clean.fits' % self.dir)
