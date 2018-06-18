@@ -375,10 +375,10 @@ def create_predict_graph(vis_graph_list, model_graph: delayed, predict=predict_2
     :return: List of vis_graphs
    """
     
-    def predict_and_sum(vis, model, **kwargs):
+    def predict_and_sum(vis, model, vis_slices):
         if vis is not None:
             predicted = copy_visibility(vis)
-            predicted = predict(predicted, model, **kwargs)
+            predicted = predict(predicted, model, vis_slices=vis_slices)
             return predicted
         else:
             return None
