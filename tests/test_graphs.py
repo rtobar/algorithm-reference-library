@@ -33,11 +33,64 @@ from arl.visibility.base import create_blockvisibility
 from arl.visibility.operations import qa_visibility
 
 
+def get_LSM(vt, npixel, cellsize=0.001, reffrequency=None, flux=0.0):
+    if reffrequency is None:
+        reffrequency = [1e8]
+    model = create_image_from_visibility(vt, npixel=npixel, cellsize=cellsize, npol=1,
+                                         frequency=reffrequency,
+                                         polarisation_frame=PolarisationFrame("stokesI"))
+    model.data[..., 32, 32] = flux
+    return model
+
+def ingest_visibility(npixel, results_dir, freq=1e8, chan_width=1e6, times=None, reffrequency=None, add_errors=False):
+    if times is None:
+        times = [0.0]
+    if reffrequency is None:
+        reffrequency = [1e8]
+    lowcore = create_named_configuration('LOWBD2-CORE')
+    frequency = numpy.array([freq])
+    channel_bandwidth = numpy.array([chan_width])
+
+    #        phasecentre = SkyCoord(ra=+180.0 * u.deg, dec=-60.0 * u.deg, frame='icrs', equinox='J2000')
+    # Observe at zenith to ensure that timeslicing works well. We test that elsewhere.
+    phasecentre = SkyCoord(ra=+180.0 * u.deg, dec=-60.0 * u.deg, frame='icrs', equinox='J2000')
+    vt = create_blockvisibility(lowcore, times, frequency, channel_bandwidth=channel_bandwidth,
+                                weight=1.0, phasecentre=phasecentre,
+                                polarisation_frame=PolarisationFrame("stokesI"))
+    cellsize = 0.001
+    model = create_image_from_visibility(vt, npixel=npixel, cellsize=cellsize, npol=1,
+                                         frequency=reffrequency,
+                                         polarisation_frame=PolarisationFrame("stokesI"))
+    flux = numpy.array([[100.0]])
+    facets = 4
+
+    rpix = model.wcs.wcs.crpix - 1.0
+    spacing_pixels = npixel // facets
+    centers = [-1.5, -0.5, 0.5, 1.5]
+    comps = list()
+    for iy in centers:
+        for ix in centers:
+            p = int(round(rpix[0] + ix * spacing_pixels * numpy.sign(model.wcs.wcs.cdelt[0]))), \
+                int(round(rpix[1] + iy * spacing_pixels * numpy.sign(model.wcs.wcs.cdelt[1])))
+            sc = pixel_to_skycoord(p[0], p[1], model.wcs, origin=1)
+            comps.append(create_skycomponent(flux=flux, frequency=vt.frequency, direction=sc,
+                                             polarisation_frame=PolarisationFrame("stokesI")))
+    predict_skycomponent_blockvisibility(vt, comps)
+    insert_skycomponent(model, comps)
+    export_image_to_fits(model, '%s/test_imaging_model.fits' % (results_dir))
+    if add_errors:
+        # These will be the same for all calls
+        numpy.random.seed(180555)
+        gt = create_gaintable_from_blockvisibility(vt)
+        gt = simulate_gaintable(gt, phase_error=1.0, amplitude_error=0.0)
+        vt = apply_gaintable(vt, gt)
+    return vt
+
 
 class TestDaskGraphs(unittest.TestCase):
     def setUp(self):
         
-        self.compute = False
+        self.compute = True
         
         self.results_dir = './test_results'
         os.makedirs(self.results_dir, exist_ok=True)
@@ -49,7 +102,7 @@ class TestDaskGraphs(unittest.TestCase):
         self.facets = 4
         
         self.vis_graph_list = self.setupVis(add_errors=False)
-        self.model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2])
+        self.model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel)
     
     def setupVis(self, add_errors=False, freqwin=3):
         self.freqwin = freqwin
@@ -58,75 +111,22 @@ class TestDaskGraphs(unittest.TestCase):
         self.times = numpy.linspace(-3.0, +3.0, self.ntimes) * numpy.pi / 12.0
         self.frequency = numpy.linspace(0.8e8, 1.2e8, self.freqwin)
         for freq in self.frequency:
-            vis_graph_list.append(delayed(self.ingest_visibility)(freq, times=self.times, add_errors=add_errors))
+            vis_graph_list.append(delayed(ingest_visibility)(self.npixel, self.results_dir, freq, times=self.times, add_errors=add_errors))
         
         self.nvis = len(vis_graph_list)
         self.wstep = 10.0
         self.vis_slices = 2 * int(numpy.ceil(numpy.max(numpy.abs(vis_graph_list[0].compute().w)) / self.wstep)) + 1
         return vis_graph_list
-    
-    def ingest_visibility(self, freq=1e8, chan_width=1e6, times=None, reffrequency=None, add_errors=False):
-        if times is None:
-            times = [0.0]
-        if reffrequency is None:
-            reffrequency = [1e8]
-        lowcore = create_named_configuration('LOWBD2-CORE')
-        frequency = numpy.array([freq])
-        channel_bandwidth = numpy.array([chan_width])
-        
-        #        phasecentre = SkyCoord(ra=+180.0 * u.deg, dec=-60.0 * u.deg, frame='icrs', equinox='J2000')
-        # Observe at zenith to ensure that timeslicing works well. We test that elsewhere.
-        phasecentre = SkyCoord(ra=+180.0 * u.deg, dec=-60.0 * u.deg, frame='icrs', equinox='J2000')
-        vt = create_blockvisibility(lowcore, times, frequency, channel_bandwidth=channel_bandwidth,
-                                    weight=1.0, phasecentre=phasecentre,
-                                    polarisation_frame=PolarisationFrame("stokesI"))
-        cellsize = 0.001
-        model = create_image_from_visibility(vt, npixel=self.npixel, cellsize=cellsize, npol=1,
-                                             frequency=reffrequency,
-                                             polarisation_frame=PolarisationFrame("stokesI"))
-        flux = numpy.array([[100.0]])
-        facets = 4
-        
-        rpix = model.wcs.wcs.crpix - 1.0
-        spacing_pixels = self.npixel // facets
-        centers = [-1.5, -0.5, 0.5, 1.5]
-        comps = list()
-        for iy in centers:
-            for ix in centers:
-                p = int(round(rpix[0] + ix * spacing_pixels * numpy.sign(model.wcs.wcs.cdelt[0]))), \
-                    int(round(rpix[1] + iy * spacing_pixels * numpy.sign(model.wcs.wcs.cdelt[1])))
-                sc = pixel_to_skycoord(p[0], p[1], model.wcs, origin=1)
-                comps.append(create_skycomponent(flux=flux, frequency=vt.frequency, direction=sc,
-                                                 polarisation_frame=PolarisationFrame("stokesI")))
-        predict_skycomponent_blockvisibility(vt, comps)
-        insert_skycomponent(model, comps)
-        self.actualmodel = copy_image(model)
-        export_image_to_fits(model, '%s/test_imaging_model.fits' % (self.results_dir))
-        if add_errors:
-            # These will be the same for all calls
-            numpy.random.seed(180555)
-            gt = create_gaintable_from_blockvisibility(vt)
-            gt = simulate_gaintable(gt, phase_error=1.0, amplitude_error=0.0)
-            vt = apply_gaintable(vt, gt)
-        return vt
-    
-    def get_LSM(self, vt, cellsize=0.001, reffrequency=None, flux=0.0):
-        if reffrequency is None:
-            reffrequency = [1e8]
-        model = create_image_from_visibility(vt, npixel=self.npixel, cellsize=cellsize, npol=1,
-                                             frequency=reffrequency,
-                                             polarisation_frame=PolarisationFrame("stokesI"))
-        model.data[..., 32, 32] = flux
-        return model
 
     def test_predict_graph(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_graph(zero_vis_graph_list, flux_model_graph,
                                                         vis_slices=self.vis_slices)
         residual_vis_graph_list = create_subtract_vis_graph_list(self.vis_graph_list,
                                                                  predicted_vis_graph_list)
         if self.compute:
+            residual_vis_graph_list[0].visualize(filename='test.svg')
             qa = qa_visibility(self.vis_graph_list[0].compute())
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1600.0, 0)
             qa = qa_visibility(predicted_vis_graph_list[0].compute())
@@ -135,7 +135,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1682.1, 0)
 
     def test_predict_wstack_graph(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_wstack_graph(zero_vis_graph_list, flux_model_graph,
                                                                vis_slices=self.vis_slices)
@@ -150,7 +150,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1629.2, 0)
 
     def test_predict_timeslice_graph(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_timeslice_graph(zero_vis_graph_list, flux_model_graph,
                                                                   vis_slices=3)
@@ -165,7 +165,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1749.2, 0)
 
     def test_predict_timeslice_graph_wprojection(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_timeslice_graph(zero_vis_graph_list, flux_model_graph,
                                                                   vis_slices=3, kernel='wprojection',
@@ -181,7 +181,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1709.4, 0)
 
     def test_predict_facet_wstack_graph(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_facet_wstack_graph(zero_vis_graph_list,
                                                                      flux_model_graph,
@@ -198,7 +198,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1643.1, 0)
 
     def test_predict_wstack_graph_wprojection(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_wstack_graph(zero_vis_graph_list, flux_model_graph,
                                                                vis_slices=11, wstep=10.0,
@@ -214,7 +214,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1668.3018405354974, 0)
 
     def test_predict_facet_timeslice_graph_wprojection(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_facet_timeslice_graph(zero_vis_graph_list, flux_model_graph,
                                                                         vis_slices=3, facets=2,
@@ -231,7 +231,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1656.6, 0)
 
     def test_predict_wprojection_graph(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_graph(zero_vis_graph_list, flux_model_graph, wstep=4.0,
                                                         kernel='wprojection')
@@ -245,8 +245,7 @@ class TestDaskGraphs(unittest.TestCase):
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1644.3, 0)
     
     def test_predict_facet_graph(self):
-        flux_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
-                                                 flux=100.0)
+        flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         zero_vis_graph_list = create_zero_vis_graph_list(self.vis_graph_list)
         predicted_vis_graph_list = create_predict_facet_graph(zero_vis_graph_list, flux_model_graph,
                                                               facets=self.facets)
@@ -424,7 +423,7 @@ class TestDaskGraphs(unittest.TestCase):
     
     def test_residual_facet_graph(self):
         
-        self.model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
+        self.model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel,
                                                  flux=100.0)
         
         dirty_graph = create_residual_facet_graph(self.vis_graph_list, self.model_graph,
@@ -442,7 +441,7 @@ class TestDaskGraphs(unittest.TestCase):
     
     def test_residual_wstack_graph(self):
         
-        self.model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
+        self.model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel,
                                                  flux=100.0)
         
         dirty_graph = create_residual_wstack_graph(self.vis_graph_list, self.model_graph,
@@ -460,7 +459,7 @@ class TestDaskGraphs(unittest.TestCase):
 
     def test_residual_facet_wstack_graph(self):
     
-        self.model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
+        self.model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel,
                                                  flux=100.0)
     
         dirty_graph = create_residual_facet_wstack_graph(self.vis_graph_list, self.model_graph,
@@ -478,7 +477,7 @@ class TestDaskGraphs(unittest.TestCase):
 
     def test_residual_wstack_graph_wprojection(self):
         
-        self.model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], flux=100.0)
+        self.model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
         
         dirty_graph = create_residual_wstack_graph(self.vis_graph_list, self.model_graph,
                                                    kernel='wprojection', vis_slices=11, wstep=10.0)
@@ -495,11 +494,11 @@ class TestDaskGraphs(unittest.TestCase):
     def test_deconvolution_facet_graph(self):
         
         facets = 4
-        model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
+        model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel,
                                             flux=0.0)
         dirty_graph = create_invert_wstack_graph(self.vis_graph_list, model_graph,
                                                  dopsf=False, vis_slices=self.vis_slices)
-        psf_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
+        psf_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel,
                                                 flux=0.0)
         psf_graph = create_invert_wstack_graph(self.vis_graph_list, psf_model_graph,
                                                vis_slices=self.vis_slices,
@@ -524,13 +523,13 @@ class TestDaskGraphs(unittest.TestCase):
     def test_deconvolution_channel_graph(self):
         
         self.vis_graph_list = self.setupVis(freqwin=8)
-        self.model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2], frequency=self.frequency)
+        self.model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, frequency=self.frequency)
 
-        model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
+        model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel,
                                             flux=0.0)
         dirty_graph = create_invert_wstack_graph(self.vis_graph_list, model_graph,
                                                  dopsf=False, vis_slices=self.vis_slices)
-        psf_model_graph = delayed(self.get_LSM)(self.vis_graph_list[self.nvis // 2],
+        psf_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel,
                                                 flux=0.0)
         psf_graph = create_invert_wstack_graph(self.vis_graph_list, psf_model_graph,
                                                vis_slices=self.vis_slices,
