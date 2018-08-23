@@ -131,7 +131,7 @@ class TestDaskGraphs(unittest.TestCase):
             qa = qa_visibility(predicted_vis_graph_list[0].compute())
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 100.064844507, 0)
             qa = qa_visibility(residual_vis_graph_list[0].compute())
-            numpy.testing.assert_almost_equal(qa.data['maxabs'], 1682.1, 0)
+            numpy.testing.assert_almost_equal(qa.data['maxabs'], 1680.1, 0)
 
     def test_predict_wstack_graph(self):
         flux_model_graph = delayed(get_LSM)(self.vis_graph_list[self.nvis // 2], npixel=self.npixel, flux=100.0)
