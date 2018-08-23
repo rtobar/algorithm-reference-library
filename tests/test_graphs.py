@@ -126,7 +126,6 @@ class TestDaskGraphs(unittest.TestCase):
         residual_vis_graph_list = create_subtract_vis_graph_list(self.vis_graph_list,
                                                                  predicted_vis_graph_list)
         if self.compute:
-            residual_vis_graph_list[0].visualize(filename='test.svg')
             qa = qa_visibility(self.vis_graph_list[0].compute())
             numpy.testing.assert_almost_equal(qa.data['maxabs'], 1600.0, 0)
             qa = qa_visibility(predicted_vis_graph_list[0].compute())
